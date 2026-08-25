@@ -1,0 +1,16 @@
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime and build output
+node_modules/
+dist/
+build/
+coverage/
+tmp/
