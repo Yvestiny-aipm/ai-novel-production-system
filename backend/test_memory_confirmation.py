@@ -1,0 +1,8 @@
+import sqlite3, tempfile
+from pathlib import Path
+from memory_confirmation import confirm_proposal
+with tempfile.TemporaryDirectory() as d:
+    db=sqlite3.connect(Path(d)/'x.db'); db.row_factory=sqlite3.Row; db.executescript((Path(__file__).parents[1]/'db/migrations/001_initial.sql').read_text()); db.execute("insert into books values ('b','B',null,1,'2026','2026')"); db.execute("insert into chapters values ('c','b',1,null,'2026','2026')"); db.execute("insert into scenes values ('s1','b','c',1,null,null,'2026','2026')"); db.execute("insert into scenes values ('s2','b','c',2,null,null,'2026','2026')")
+    for i,s,st in [('1','s1','waiting_confirmation'),('2','s2','paused')]: db.execute("insert into task_states(task_id,task_scope,book_id,chapter_id,scene_id,current_node,status,next_action,active_contract_refs_json,state_history_json,idempotency_key,created_at,updated_at) values (?,?,?,?,?,?,?,?,?,?,?,?,?)",('t'+i,'scene','b','c',s,'human_confirmation' if i=='1' else 'planning',st,'await_human_confirmation','[]','[]','k'+i,'2026','2026'))
+    db.execute("insert into prose_drafts values ('d','b','c','s1',1,1,1,1,'x',1,1250,1,'{}','passed','h','hc',1,1,'2026')"); db.execute("insert into quality_reports values ('r','b','c','s1','d','h',1,'completed','[]',0,0,0,0,0,'complete','{}','passed','2026')"); db.execute("insert into memory_proposals values ('p','b','c','s1','d','r',1,'world_rule','book_memory','x','create',null,'{\"x\":1}','e','s','r','none','human_confirmation','pending','2026')"); db.commit(); assert confirm_proposal(db,'p','u')['status']=='completed'; assert db.execute("select status from task_states where task_id='t1'").fetchone()[0]=='completed'
+print('memory confirmation ok')

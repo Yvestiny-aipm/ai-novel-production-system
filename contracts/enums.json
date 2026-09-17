@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-novel-production-system.local/contracts/enums.json",
+  "title": "AI Novel Production System enums",
+  "type": "object",
+  "properties": {
+    "taskScope": { "enum": ["book", "chapter", "scene"] },
+    "currentNode": { "enum": ["planning", "writing", "reviewing", "arbiter", "memory_processing", "human_confirmation", "exception_handling"] },
+    "taskStatus": { "enum": ["queued", "running", "reworking_writing", "reworking_planning", "waiting_confirmation", "paused", "exception_pending", "blocked", "completed", "skipped", "cancelled"] },
+    "nextAction": { "enum": ["start_planning", "start_writing", "start_reviewing", "start_arbiter", "process_memory", "await_human_confirmation", "handle_exception", "resume", "pause", "cancel", "skip_scene", "replan", "rewrite", "retry_technical", "complete", "none"] },
+    "briefStatus": { "enum": ["draft", "confirmed", "superseded"] },
+    "planStatus": { "enum": ["draft", "validated", "ready", "superseded"] },
+    "draftStatus": { "enum": ["generated", "in_review", "passed", "failed", "superseded"] },
+    "reviewCompletionStatus": { "enum": ["pending", "completed", "partial", "failed"] },
+    "reviewStatus": { "enum": ["passed", "failed", "needs_arbiter"] },
+    "reviewerRole": { "enum": ["world_consistency", "character_plot", "language_experience"] },
+    "issueCategory": { "enum": ["world_rule", "continuity", "character", "plot", "language", "reading_experience", "other"] },
+    "severity": { "enum": ["ordinary", "serious"] },
+    "impactScope": { "enum": ["local", "cross_scene", "cross_chapter", "book"] },
+    "memoryType": { "enum": ["scene_fact", "narrative_event", "world_rule", "character_detail", "character_state", "location_state", "world_rule_proposal", "public_library_proposal"] },
+    "targetScope": { "enum": ["scene_memory", "book_memory", "public_library"] },
+    "memoryAction": { "enum": ["create", "update", "delete"] },
+    "conflictStatus": { "enum": ["none", "conflict", "resolved"] },
+    "writePolicy": { "enum": ["auto_save", "human_confirmation", "never_auto_write"] },
+    "proposalStatus": { "enum": ["pending", "approved", "rejected", "written", "conflict"] },
+    "acceptedSceneStateStatus": { "enum": ["accepted", "not_accepted"] },
+    "backupStatus": { "enum": ["backup_running", "backup_success", "backup_failed", "restore_testing", "restore_success", "restore_failed"] }
+  },
+  "additionalProperties": false
+}

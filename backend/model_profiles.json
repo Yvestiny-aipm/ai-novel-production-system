@@ -1,0 +1,18 @@
+{
+  "provider": "siliconflow",
+  "api_key_env": "SILICONFLOW_API_KEY",
+  "model": "deepseek-ai/DeepSeek-V3",
+  "api_url_env": "SILICONFLOW_API_URL",
+  "routes": {
+    "planning": "deepseek",
+    "writing": "deepseek",
+    "review_world": "deepseek",
+    "review_plot": "deepseek",
+    "review_style": "deepseek",
+    "memory_extraction": "deepseek",
+    "arbiter": "deepseek"
+  },
+  "profiles": {
+    "deepseek": { "timeout_seconds": 60, "technical_retries": 1, "max_output_tokens": 4096, "budget_limit": null, "prompt_version": "v1" }
+  }
+}

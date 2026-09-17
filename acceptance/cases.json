@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "cases": [
+    {"id":"normal_scene","expected":["planning","writing","reviewing","memory_processing","completed"]},
+    {"id":"ordinary_issues_rewrite","expected":["reviewing","reworking_writing","writing"]},
+    {"id":"too_many_issues_arbiter","expected":["reviewing","arbiter"]},
+    {"id":"cross_scene_arbiter","expected":["reviewing","arbiter"]},
+    {"id":"true_conflict_arbiter","expected":["reviewing","arbiter"]},
+    {"id":"third_draft_replan","expected":["reworking_planning","planning"]},
+    {"id":"replan_still_fails_blocked","expected":["reworking_planning","blocked"]},
+    {"id":"technical_failure_exception","expected":["exception_pending","exception_handling","writing"]},
+    {"id":"memory_permissions","expected":["scene_fact:auto_save","world_rule_proposal:human_confirmation","conflict:never_auto_write"]},
+    {"id":"duplicate_generation","expected":["same_task_id"]},
+    {"id":"skip_scene_gap","expected":["skipped","continuity_gap_recorded"]},
+    {"id":"version_conflict","expected":["VERSION_CONFLICT","latest_state_preserved"]}
+  ]
+}

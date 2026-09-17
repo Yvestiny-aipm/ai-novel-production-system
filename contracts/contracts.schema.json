@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-novel-production-system.local/contracts/contracts.schema.json",
+  "title": "AI Novel Production System business contracts",
+  "description": "固定七类业务 Contract 的通用包络。模型请求和响应属于 Harness 内部记录，不在此处定义。",
+  "type": "object",
+  "required": ["contract_type", "contract_version", "payload"],
+  "properties": {
+    "contract_type": { "enum": ["CreativeBrief", "ScenePlan", "ContextPack", "ProseDraft", "QualityReport", "MemoryProposal", "TaskState"] },
+    "contract_version": { "type": "string", "pattern": "^v[0-9]+$" },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "integer", "minimum": 1 },
+    "hash": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "text": { "type": "string" },
+    "stringArray": { "type": "array", "items": { "type": "string" } },
+    "CreativeBrief": {
+      "type": "object", "additionalProperties": false,
+      "required": ["brief_id", "book_id", "brief_version", "status", "title", "genre", "theme", "target_length", "main_characters", "character_relationships", "world_background", "core_rules", "main_conflict", "style_requirements", "ending_direction", "special_requirements"],
+      "properties": {
+        "brief_id": { "$ref": "#/$defs/id" }, "book_id": { "$ref": "#/$defs/id" }, "brief_version": { "$ref": "#/$defs/version" }, "status": { "enum": ["draft", "confirmed", "superseded"] },
+        "title": { "$ref": "#/$defs/text" }, "genre": { "$ref": "#/$defs/text" }, "theme": { "$ref": "#/$defs/text" }, "target_length": { "type": "integer", "minimum": 1 },
+        "main_characters": { "type": "array", "items": { "type": "object" } }, "character_relationships": { "type": "array", "items": { "type": "object" } },
+        "world_background": { "$ref": "#/$defs/text" }, "core_rules": { "type": "array", "items": { "type": "object" } }, "main_conflict": { "$ref": "#/$defs/text" }, "style_requirements": { "$ref": "#/$defs/text" }, "ending_direction": { "$ref": "#/$defs/text" }, "special_requirements": { "$ref": "#/$defs/text" }
+      }
+    },
+    "ScenePlan": {
+      "type": "object", "additionalProperties": false,
+      "required": ["plan_id", "book_id", "chapter_id", "scene_id", "plan_version", "brief_version", "story_state_version", "scene_goal", "entrance_state", "exit_state", "characters", "location", "time_context", "conflict", "action_beats", "must_happen", "must_not_happen", "knowledge_boundary", "target_word_count", "acceptance_criteria", "validation_result", "ready_for_writing"],
+      "properties": {
+        "plan_id": { "$ref": "#/$defs/id" }, "book_id": { "$ref": "#/$defs/id" }, "chapter_id": { "$ref": "#/$defs/id" }, "scene_id": { "$ref": "#/$defs/id" }, "plan_version": { "$ref": "#/$defs/version" }, "brief_version": { "$ref": "#/$defs/version" }, "story_state_version": { "$ref": "#/$defs/version" }, "scene_goal": { "$ref": "#/$defs/text" }, "entrance_state": { "type": "object" }, "exit_state": { "type": "object" }, "characters": { "type": "array", "items": { "type": "object" } }, "location": { "$ref": "#/$defs/text" }, "time_context": { "$ref": "#/$defs/text" }, "conflict": { "$ref": "#/$defs/text" }, "action_beats": { "type": "array", "items": { "type": "object" } }, "must_happen": { "$ref": "#/$defs/stringArray" }, "must_not_happen": { "$ref": "#/$defs/stringArray" }, "knowledge_boundary": { "$ref": "#/$defs/text" }, "target_word_count": { "type": "integer", "minimum": 1 }, "acceptance_criteria": { "type": "array", "items": { "type": "object" } }, "validation_result": { "type": "object" }, "ready_for_writing": { "type": "boolean" }
+      }
+    },
+    "ContextPack": {
+      "type": "object", "additionalProperties": false,
+      "required": ["context_pack_id", "book_id", "chapter_id", "scene_id", "context_pack_version", "target_agent", "target_node", "brief_version", "plan_version", "story_state_version", "canon_version", "scene_plan_id", "scene_plan_snapshot_hash", "approved_facts", "previous_scene_state", "chapter_summary", "excluded_sources", "missing_sources", "conflicts", "content_hash", "assembled_at"],
+      "properties": {
+        "context_pack_id": { "$ref": "#/$defs/id" }, "book_id": { "$ref": "#/$defs/id" }, "chapter_id": { "$ref": "#/$defs/id" }, "scene_id": { "$ref": "#/$defs/id" }, "context_pack_version": { "$ref": "#/$defs/version" }, "target_agent": { "$ref": "#/$defs/text" }, "target_node": { "$ref": "#/$defs/text" }, "brief_version": { "$ref": "#/$defs/version" }, "plan_version": { "$ref": "#/$defs/version" }, "story_state_version": { "$ref": "#/$defs/version" }, "canon_version": { "$ref": "#/$defs/version" }, "scene_plan_id": { "$ref": "#/$defs/id" }, "scene_plan_snapshot_hash": { "$ref": "#/$defs/hash" }, "approved_facts": { "type": "array", "items": { "type": "object" } }, "previous_scene_state": { "type": "object" }, "chapter_summary": { "$ref": "#/$defs/text" }, "excluded_sources": { "type": "array", "items": { "type": "object" } }, "missing_sources": { "type": "array", "items": { "type": "object" } }, "conflicts": { "type": "array", "items": { "type": "object" } }, "content_hash": { "$ref": "#/$defs/hash" }, "assembled_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "ProseDraft": {
+      "type": "object", "additionalProperties": false,
+      "required": ["draft_id", "book_id", "chapter_id", "scene_id", "draft_version", "attempt", "plan_version", "context_pack_version", "text", "word_count", "target_word_count", "complete", "writer_self_check", "status", "draft_hash", "harness_call_id", "content_attempt_in_plan", "content_attempt_total"],
+      "properties": {
+        "draft_id": { "$ref": "#/$defs/id" }, "book_id": { "$ref": "#/$defs/id" }, "chapter_id": { "$ref": "#/$defs/id" }, "scene_id": { "$ref": "#/$defs/id" }, "draft_version": { "$ref": "#/$defs/version" }, "attempt": { "type": "integer", "minimum": 1 }, "plan_version": { "$ref": "#/$defs/version" }, "context_pack_version": { "$ref": "#/$defs/version" }, "text": { "$ref": "#/$defs/text" }, "word_count": { "type": "integer", "minimum": 0 }, "target_word_count": { "type": "integer", "minimum": 1 }, "complete": { "type": "boolean" }, "writer_self_check": { "type": "object" }, "status": { "enum": ["generated", "in_review", "passed", "failed", "superseded"] }, "draft_hash": { "$ref": "#/$defs/hash" }, "harness_call_id": { "$ref": "#/$defs/id" }, "content_attempt_in_plan": { "type": "integer", "minimum": 1 }, "content_attempt_total": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "QualityReport": {
+      "type": "object", "additionalProperties": false,
+      "required": ["report_id", "book_id", "chapter_id", "scene_id", "draft_id", "draft_hash", "review_attempt", "review_completion_status", "reviewer_results", "deduped_issue_count", "ordinary_issue_count", "serious_issue_count", "has_true_conflict", "needs_arbiter", "routing_recommendation", "accepted_scene_state", "status"],
+      "properties": {
+        "report_id": { "$ref": "#/$defs/id" }, "book_id": { "$ref": "#/$defs/id" }, "chapter_id": { "$ref": "#/$defs/id" }, "scene_id": { "$ref": "#/$defs/id" }, "draft_id": { "$ref": "#/$defs/id" }, "draft_hash": { "$ref": "#/$defs/hash" }, "review_attempt": { "type": "integer", "minimum": 1 }, "review_completion_status": { "enum": ["pending", "completed", "partial", "failed"] }, "reviewer_results": { "type": "array", "items": { "type": "object" } }, "deduped_issue_count": { "type": "integer", "minimum": 0 }, "ordinary_issue_count": { "type": "integer", "minimum": 0 }, "serious_issue_count": { "type": "integer", "minimum": 0 }, "has_true_conflict": { "type": "boolean" }, "needs_arbiter": { "type": "boolean" }, "routing_recommendation": { "$ref": "#/$defs/text" }, "accepted_scene_state": { "type": "object" }, "status": { "enum": ["passed", "failed", "needs_arbiter"] }
+      }
+    },
+    "MemoryProposal": {
+      "type": "object", "additionalProperties": false,
+      "required": ["proposal_id", "book_id", "chapter_id", "scene_id", "source_draft_id", "source_report_id", "proposal_version", "memory_type", "target_scope", "target_key", "action", "before_value", "after_value", "evidence", "evidence_location", "change_reason", "conflict_status", "write_policy", "status"],
+      "properties": {
+        "proposal_id": { "$ref": "#/$defs/id" }, "book_id": { "$ref": "#/$defs/id" }, "chapter_id": { "$ref": "#/$defs/id" }, "scene_id": { "$ref": "#/$defs/id" }, "source_draft_id": { "$ref": "#/$defs/id" }, "source_report_id": { "$ref": "#/$defs/id" }, "proposal_version": { "$ref": "#/$defs/version" }, "memory_type": { "enum": ["scene_fact", "character_state", "location_state", "world_rule_proposal", "public_library_proposal"] }, "target_scope": { "enum": ["scene_memory", "book_memory", "public_library"] }, "target_key": { "$ref": "#/$defs/id" }, "action": { "enum": ["create", "update", "delete"] }, "before_value": {}, "after_value": {}, "evidence": { "$ref": "#/$defs/text" }, "evidence_location": { "$ref": "#/$defs/text" }, "change_reason": { "$ref": "#/$defs/text" }, "conflict_status": { "enum": ["none", "conflict", "resolved"] }, "write_policy": { "enum": ["auto_save", "human_confirmation", "never_auto_write"] }, "status": { "enum": ["pending", "approved", "rejected", "written", "conflict"] }
+      }
+    },
+    "TaskState": {
+      "type": "object", "additionalProperties": false,
+      "required": ["task_id", "task_scope", "book_id", "current_node", "status", "next_action", "plan_attempt", "content_attempt_in_plan", "content_attempt_total", "technical_retry_count", "active_contract_refs", "idempotency_key", "run_lock", "state_version", "state_history", "created_at", "updated_at"],
+      "properties": {
+        "task_id": { "$ref": "#/$defs/id" }, "task_scope": { "enum": ["book", "chapter", "scene"] }, "book_id": { "$ref": "#/$defs/id" }, "chapter_id": { "$ref": "#/$defs/id" }, "scene_id": { "$ref": "#/$defs/id" }, "current_node": { "enum": ["planning", "writing", "reviewing", "arbiter", "memory_processing", "human_confirmation", "exception_handling"] }, "status": { "enum": ["queued", "running", "reworking_writing", "reworking_planning", "waiting_confirmation", "paused", "exception_pending", "blocked", "completed", "skipped", "cancelled"] }, "next_action": { "$ref": "#/$defs/text" }, "plan_attempt": { "type": "integer", "minimum": 1 }, "content_attempt_in_plan": { "type": "integer", "minimum": 0 }, "content_attempt_total": { "type": "integer", "minimum": 0 }, "technical_retry_count": { "type": "integer", "minimum": 0 }, "active_contract_refs": { "type": "array", "items": { "type": "object" } }, "pause_reason": { "type": ["string", "null"] }, "block_reason": { "type": ["string", "null"] }, "exception_id": { "type": ["string", "null"] }, "skip_record": { "type": ["object", "null"] }, "idempotency_key": { "$ref": "#/$defs/id" }, "run_lock": { "type": ["object", "null"] }, "state_version": { "$ref": "#/$defs/version" }, "state_history": { "type": "array", "items": { "type": "object" } }, "last_error": { "type": ["object", "null"] }, "created_at": { "$ref": "#/$defs/timestamp" }, "updated_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}

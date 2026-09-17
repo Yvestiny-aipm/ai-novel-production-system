@@ -1,16 +1,42 @@
-# OS and editor files
+# Local secrets and credentials (only environment-variable names belong in Git)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+
+# Python, OS, editor and build artifacts
+__pycache__/
+*.py[cod]
+*.so
 .DS_Store
 .idea/
 .vscode/
-
-# Local environment and secrets
-.env
-.env.*
-!.env.example
-
-# Runtime and build output
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
 node_modules/
 dist/
 build/
 coverage/
+
+# Runtime data: real-model databases, backups, restores, logs and temporary output
+data/*
+!data/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+data/stage13/backups/
+data/stage13/restores/
+logs/
+*.log
 tmp/
+temp/
+*.tmp
+*.bak

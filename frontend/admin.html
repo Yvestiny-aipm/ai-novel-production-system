@@ -1,0 +1,11 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>管理后台</title>
+<style>body{font:15px system-ui;max-width:1000px;margin:2rem auto}section{border:1px solid #ddd;border-radius:8px;padding:1rem;margin:1rem 0}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #eee;padding:.5rem;text-align:left}.muted{color:#666}</style>
+<h1>管理后台</h1><p class="muted">运行管理与审计视图。权限由统一后端校验。</p>
+<section><h2>用户与角色</h2><table><tr><th>用户</th><th>角色</th><th>作品范围</th></tr><tr><td>当前登录用户</td><td id="role">读取中</td><td>由权限服务返回</td></tr></table></section>
+<section><h2>模型 API / Harness 路由</h2><pre id="routes">GET /api/v1/admin/model-routes</pre></section>
+<section><h2>调用记录与异常</h2><pre>GET /api/v1/admin/harness-calls
+GET /api/v1/admin/exceptions</pre></section>
+<section><h2>任务强制控制</h2><p>管理员可暂停、恢复或取消任务；正文和正式世界规则没有直接编辑入口。</p><input id="task" placeholder="task_id"><button onclick="force('pause')">强制暂停</button><button onclick="force('resume')">恢复</button><button onclick="force('cancel')">取消</button><pre id="out"></pre></section>
+<section><h2>备份状态</h2><pre>GET /api/v1/admin/backups
+状态：backup_running / backup_success / backup_failed / restore_testing / restore_success / restore_failed</pre></section>
+<script>async function force(action){const id=document.querySelector('#task').value;if(!id)return;const r=await fetch('/api/v1/tasks/'+encodeURIComponent(id)+'/actions',{method:'POST',headers:{'Content-Type':'application/json','X-Role':'system_admin'},body:JSON.stringify({action,expected_state_version:1,actor_id:'admin'})});document.querySelector('#out').textContent=await r.text()}</script></html>

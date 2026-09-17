@@ -1,0 +1,9 @@
+import sqlite3, tempfile
+from pathlib import Path
+from integration.run_real_test import save_report, save_proposal
+from harness import required_fields_validator
+with tempfile.TemporaryDirectory() as d:
+    db=sqlite3.connect(Path(d)/'x.db'); db.executescript((Path(__file__).parents[1]/'db/migrations/001_initial.sql').read_text()); db.execute("insert into books values ('b','B',null,1,'2026','2026')"); db.execute("insert into chapters values ('c','b',1,null,'2026','2026')"); db.execute("insert into scenes values ('s','b','c',1,null,null,'2026','2026')"); db.execute("insert into prose_drafts values ('d','b','c','s',1,1,1,1,'x',1,1250,1,'{}','passed','hash','hc',1,1,'2026')"); db.commit()
+    report={'contract_type':'QualityReport','contract_version':'v1','payload':{'review_completion_status':'completed','reviewer_results':[],'deduped_issue_count':0,'ordinary_issue_count':0,'serious_issue_count':0,'has_true_conflict':False,'needs_arbiter':False,'routing_recommendation':'complete','accepted_scene_state':{'characters':['林照'],'location':'灯塔','time_context':'夜晚','events':['调查'],'relationship_changes':['林照决定继续调查'],'unresolved_threads':['林澜失踪']},'status':'passed'}}; required_fields_validator(report,'QualityReport'); rid,passed,state=save_report(db,'b','c','s','d','hash',[report]); assert passed and state
+    proposal={'contract_type':'MemoryProposal','contract_version':'v1','payload':{'memory_type':'scene_fact','target_scope':'scene_memory','target_key':'scene_fact:lighthouse:memory_rule','action':'create','before_value':None,'after_value':{'scene':1},'evidence':'x','evidence_location':'scene','change_reason':'x','conflict_status':'none','write_policy':'auto_save','status':'pending'}}; required_fields_validator(proposal,'MemoryProposal'); pid,written=save_proposal(db,'b','c','s','d',rid,proposal); assert written and db.execute('select count(*) from memory_records').fetchone()[0]==1
+print('quality pass chain ok')
