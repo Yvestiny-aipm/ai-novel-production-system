@@ -18,12 +18,14 @@
     "severity": { "enum": ["ordinary", "serious"] },
     "impactScope": { "enum": ["local", "cross_scene", "cross_chapter", "book"] },
     "memoryType": { "enum": ["scene_fact", "narrative_event", "world_rule", "character_detail", "character_state", "location_state", "world_rule_proposal", "public_library_proposal"] },
-    "targetScope": { "enum": ["scene_memory", "book_memory", "public_library"] },
+    "targetScope": { "enum": ["scene_memory", "book_memory", "character_memory", "public_library"] },
     "memoryAction": { "enum": ["create", "update", "delete"] },
     "conflictStatus": { "enum": ["none", "conflict", "resolved"] },
     "writePolicy": { "enum": ["auto_save", "human_confirmation", "never_auto_write"] },
     "proposalStatus": { "enum": ["pending", "approved", "rejected", "written", "conflict"] },
     "acceptedSceneStateStatus": { "enum": ["accepted", "not_accepted"] },
+    "lengthValidationStatus": { "enum": ["passed", "failed"] },
+    "lengthValidationReason": { "enum": ["empty_text", "under_length", "over_length"] },
     "backupStatus": { "enum": ["backup_running", "backup_success", "backup_failed", "restore_testing", "restore_success", "restore_failed"] }
   },
   "additionalProperties": false

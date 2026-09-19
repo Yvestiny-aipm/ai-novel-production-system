@@ -21,21 +21,23 @@ def scene_plan(number):
         'characters':['林照'],'location':'灯塔档案室','time_context':'夜晚','conflict':'寻找林澜',
         'action_beats':['调查档案'],'must_happen':['发现线索'],'must_not_happen':['解决谜团'],
         'knowledge_boundary':'灯塔只能保存记忆','target_word_count':1250,
-        'acceptance_criteria':['推进调查'],'validation_result':{'complete':True},'ready_for_writing':True}}
+        'acceptance_criteria':['推进调查'],'validation_result':{'complete':True},'ready_for_writing':True,
+        'progression_requirements':[{'progress_type':'new_clue','target_key':'灯塔线索','before_state':'未知','expected_after_state':'发现线索','acceptance_criterion':'正文发现线索'}]}}
 
 
 def draft(number):
     return {'contract_type':'ProseDraft','contract_version':'v1','payload':{
-        'text':f'第{number}场正文：林照在灯塔档案室继续调查林澜失踪。', 'word_count':1250,
+        'text':(f'第{number}场正文：林照在灯塔档案室继续调查林澜失踪。' * 50), 'word_count':1250,
         'target_word_count':1250,'complete':True,'writer_self_check':{'complete':True}}}
 
 
 def reviewer(role, number):
     return {'contract_type':'ReviewerResult','contract_version':'v1','payload':{
-        'reviewer_role':role,'result':'passed','findings':'通过','issue_count':0,'severity':'ordinary',
+        'reviewer_role':role,'result':'passed','findings':[],'suggestions':[],'issue_count':0,'severity':'ordinary',
         'impact_scope':'local','true_conflict_candidate':False,'scene_state':{
             'characters':['林照'],'location':'灯塔档案室','time_context':'夜晚',
-            'events':[f'第{number}场调查'], 'relationship_changes':[], 'unresolved_threads':['林澜失踪']}}}
+            'events':['发现线索'], 'relationship_changes':[], 'unresolved_threads':['林澜失踪']},
+        'progression_assessment':{'status':'achieved','achieved_items':[{'progress_type':'new_clue','target_key':'灯塔线索','before_state':'未知','after_state':'发现线索','evidence_text':'林照','evidence_location':'draft.text'}],'missing_items':[],'evidence':'林照'}}}
 
 
 def proposal(number):
@@ -60,7 +62,12 @@ class Adapter:
 
 def snapshot(db):
     tables=('scene_plans','prose_drafts','quality_reports','memory_proposals','memory_records','harness_calls','context_packs')
-    return {table:[tuple(row) for row in db.execute(f'SELECT * FROM {table} ORDER BY 1')] for table in tables}
+    # The new length-audit migration may append columns to a legacy prepared
+    # fixture.  Compare the frozen v0.1 business columns, not SQLite's shape.
+    prose_columns=('draft_id','book_id','chapter_id','scene_id','draft_version','attempt','plan_version','context_pack_version','text','word_count','target_word_count','complete','writer_self_check_json','status','draft_hash','harness_call_id','content_attempt_in_plan','content_attempt_total','created_at')
+    return {table:[tuple(row) for row in db.execute(
+        f"SELECT {','.join(prose_columns) if table == 'prose_drafts' else '*'} FROM {table} ORDER BY 1")]
+            for table in tables}
 
 
 def copy_prepared(path):

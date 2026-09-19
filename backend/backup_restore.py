@@ -20,11 +20,14 @@ SIDECARS = (
     Path("contracts/enums.json"),
     Path("backend/model_profiles.json"),
     Path("db/migrations/001_initial.sql"),
+    Path("db/migrations/002_prose_draft_length_validation.sql"),
+    Path("db/migrations/003_content_similarity_checks.sql"),
+    Path("db/migrations/004_scene_progression_checks.sql"),
 )
 SCENE_TABLES = (
     "books", "chapters", "creative_briefs", "scenes", "task_states",
     "scene_plans", "context_packs", "prose_drafts", "quality_reports",
-    "memory_proposals", "memory_records", "harness_calls", "task_events",
+    "memory_proposals", "memory_records", "content_similarity_checks", "scene_progression_checks", "harness_calls", "task_events",
     "exception_queue",
 )
 
@@ -203,6 +206,8 @@ def _scene_rows(source: sqlite3.Connection, table: str, book_id: str, chapter_id
         "quality_reports": ("scene_id=?", (scene_id,)),
         "memory_proposals": ("scene_id=?", (scene_id,)),
         "memory_records": ("scene_id=?", (scene_id,)),
+        "content_similarity_checks": ("current_scene_id=?", (scene_id,)),
+        "scene_progression_checks": ("scene_id=?", (scene_id,)),
         "harness_calls": ("task_id=?", (task_id,)),
         "task_events": ("task_id=?", (task_id,)),
         "exception_queue": ("task_id=?", (task_id,)),
@@ -222,7 +227,11 @@ def restore_scene_scope(backup_dir: Path, target_db: Path, scene_id: str) -> dic
             raise BackupRestoreError("BACKUP_SCENE_NOT_FOUND")
         restored = {}
         for table in SCENE_TABLES:
+            if not source.execute("select 1 from sqlite_master where type='table' and name=?", (table,)).fetchone():
+                continue  # legacy backups predate this append-only audit table
             columns = _columns(source, table)
+            if not target.execute("select 1 from sqlite_master where type='table' and name=?", (table,)).fetchone():
+                continue  # target uses an older compatible migration set
             _columns(target, table)
             restored[table] = sum(_insert_unchanged(target, table, row, columns)
                                   for row in _scene_rows(source, table, scene[0], scene[1], scene_id, task[0]))

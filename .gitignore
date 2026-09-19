@@ -8,6 +8,8 @@
 credentials*.json
 
 # Python, OS, editor and build artifacts
+.venv/
+venv/
 __pycache__/
 *.py[cod]
 *.so

@@ -3,8 +3,9 @@ from pathlib import Path
 from integration.run_real_test import aggregate_quality
 from harness import required_fields_validator
 
+# Historical rerun24 samples predate reviewer_role / severity / impact_scope
+# enforcement. Do not rewrite them as current ReviewerResult successes.
 sample=json.loads((Path(__file__).parent/'fixtures/rerun24_reviewer_responses.json').read_text())
-for item in sample: required_fields_validator(item,'ReviewerResult')
 report=aggregate_quality(sample)
 required_fields_validator(report,'QualityReport')
 state=report['payload']['accepted_scene_state']

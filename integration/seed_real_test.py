@@ -4,11 +4,14 @@ from pathlib import Path
 FIXTURE=Path(__file__).parent/'real-test-fixture-v1.md'
 def seed(db_path):
     root=Path(__file__).parents[1]; db=sqlite3.connect(db_path); db.execute('PRAGMA foreign_keys=ON')
-    migration='001_initial'
-    has_migrations=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").fetchone()
-    applied=has_migrations and db.execute('SELECT 1 FROM schema_migrations WHERE version=?',(migration,)).fetchone()
-    if not applied:
-        db.executescript((root/'db/migrations/001_initial.sql').read_text())
+    # Migrations are append-only and may be safely applied to an existing
+    # test database; never rerun an already recorded migration.
+    for path in sorted((root/'db/migrations').glob('*.sql')):
+        migration=path.stem
+        has_migrations=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").fetchone()
+        applied=has_migrations and db.execute('SELECT 1 FROM schema_migrations WHERE version=?',(migration,)).fetchone()
+        if not applied:
+            db.executescript(path.read_text())
     columns={row[1] for row in db.execute('PRAGMA table_info(task_states)')}
     if 'execution_mode' not in columns: db.execute("ALTER TABLE task_states ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'sequential'")
     book='realtest_tide_archive'; db.execute("INSERT OR IGNORE INTO books VALUES (?,?,?,?,?,?)",(book,'潮痕档案',1,1,'2026','2026'))

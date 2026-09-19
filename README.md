@@ -8,6 +8,10 @@
 
 详见：[第一版本地验收发布说明](docs/第一版本地验收发布说明-v0.1.0.md)、[阶段 12 真实模型验收](docs/阶段12真实模型验收报告-v1.md)、[阶段 13 备份恢复验收](docs/阶段13备份恢复最终验收报告-v1.md)。
 
+## 当前冻结（质量关卡 + 公司 API）
+
+在 `v0.1.0` 之上已接入真实字数、实质重复、剧情推进三项关卡，以及 Azure Foundry Claude Opus 5 结构化任务适配。写作默认仍走硅基流动 DeepSeek。五场公司 API 验证已通过；20～40 场和 160 场尚未开始。密钥和真实测试库不入库。
+
 ## 架构与主链路
 
 ```text
@@ -40,8 +44,11 @@ Agent 只能读取当前任务的 ContextPack，并通过 Harness 发出独立�
 
 ```sh
 cd "/Users/czy/AI长文系统/新系统开发"
-python3 -m py_compile backend/*.py integration/*.py
-PYTHONPATH=. python3 acceptance/run_cases.py
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m py_compile backend/*.py integration/*.py
+PYTHONPATH=. python acceptance/run_cases.py
 ```
 
 数据库初始化示例：
@@ -54,17 +61,23 @@ PYTHONPATH=. python3 acceptance/run_cases.py
 
 ## 环境变量与真实模型测试
 
-硅基流动密钥只从环境变量读取。以下值是占位符：
+密钥只从环境变量读取。默认仍走硅基流动；要把规划/审查切到 Azure Foundry 的 Opus 5 时，再加上 Foundry 变量。以下值是占位符：
 
 ```sh
 export RUN_REAL_MODEL=1
 export SILICONFLOW_API_KEY="<your-siliconflow-api-key>"
 export EXECUTION_MODE=sequential
 export REAL_TEST_DB="$PWD/data/real_test.db"
+# 可选：结构化任务改走 Claude Opus 5，写作仍走 DeepSeek
+export STRUCTURED_PROVIDER=azure_foundry
+export AZURE_FOUNDRY_CLAUDE_ENDPOINT="https://ayw-cuizhiyuan-7093-resource.services.ai.azure.com/anthropic"
+export AZURE_FOUNDRY_CLAUDE_DEPLOYMENT="claude-opus-5-ay-cuizhiyuan"
+export AZURE_FOUNDRY_CLAUDE_API_KEY="<your-foundry-api-key>"
+# 若用 Entra 而不用 Key：export AZURE_FOUNDRY_AUTH=entra
 python3 integration/run_real_test.py
 ```
 
-真实运行会保留调用记录和失败现场；不要将 `data/` 中的数据库、备份或 API Key 提交到 Git。未设置 `RUN_REAL_MODEL=1` 或密钥时，runner 只返回 `not_run`。
+真实运行会保留调用记录和失败现场；不要将 `data/` 中的数据库、备份或 API Key 提交到 Git。未设置 `RUN_REAL_MODEL=1` 或当前路由所需密钥时，runner 只返回 `not_run`。
 
 ## Mock 与回归测试
 
@@ -74,6 +87,8 @@ PYTHONPATH=. python3 backend/test_recovery_preserves_history.py
 PYTHONPATH=. python3 backend/test_immutable_business_records.py
 PYTHONPATH=. python3 backend/test_rerun31_memory_target_key_regression.py
 PYTHONPATH=. python3 backend/test_backup_restore.py
+PYTHONPATH=. python3 backend/test_azure_foundry.py
+PYTHONPATH=. python3 backend/test_foundry_routing.py
 ```
 
 ## 备份与恢复

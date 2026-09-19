@@ -29,22 +29,24 @@ def plan(number):
         "action_beats": ["调查档案"], "must_happen": ["发现线索"], "must_not_happen": ["谜团不能解决"],
         "knowledge_boundary": "灯塔只能保存记忆", "target_word_count": 1250,
         "acceptance_criteria": ["推进调查"], "validation_result": {"complete": True}, "ready_for_writing": True,
+        "progression_requirements": [{"progress_type":"new_clue","target_key":"灯塔线索","before_state":"未知","expected_after_state":"发现线索","acceptance_criterion":"正文发现线索"}],
     }}
 
 
 def draft(number):
     return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
-        "text": f"第{number}场：林照在灯塔档案室继续调查林澜的失踪。", "word_count": 1250,
+        "text": (f"第{number}场：林照在灯塔档案室继续调查林澜的失踪。" * 50), "word_count": 1250,
         "target_word_count": 1250, "complete": True, "writer_self_check": {"complete": True},
     }}
 
 
 def reviewer(role, number):
     return {"contract_type": "ReviewerResult", "contract_version": "v1", "payload": {
-        "reviewer_role": role, "result": "passed", "findings": "通过", "issue_count": 0,
+        "reviewer_role": role, "result": "passed", "findings": [], "suggestions": [], "issue_count": 0,
         "severity": "ordinary", "impact_scope": "local", "true_conflict_candidate": False,
         "scene_state": {"characters": ["林照"], "location": "灯塔档案室", "time_context": "夜晚",
-                        "events": [f"第{number}场调查"], "relationship_changes": [], "unresolved_threads": ["林澜失踪"]},
+                        "events": ["发现线索"], "relationship_changes": [], "unresolved_threads": ["林澜失踪"]},
+        "progression_assessment": {"status":"achieved","achieved_items":[{"progress_type":"new_clue","target_key":"灯塔线索","before_state":"未知","after_state":"发现线索","evidence_text":"林照","evidence_location":"draft.text"}],"missing_items":[],"evidence":"林照"},
     }}
 
 
@@ -77,7 +79,7 @@ with tempfile.TemporaryDirectory() as temporary:
     full = restore_full_backup(backup, root / "restore" / "full.db")
     source_db = sqlite3.connect(SOURCE)
     restored_db = sqlite3.connect(full)
-    for table in ("scene_plans", "prose_drafts", "quality_reports", "memory_proposals", "memory_records", "task_states", "harness_calls"):
+    for table in ("scene_plans", "prose_drafts", "quality_reports", "memory_proposals", "memory_records", "task_states", "harness_calls", "exception_queue"):
         assert count_rows(source_db, table) == count_rows(restored_db, table)
     source_db.close(); restored_db.close()
 
