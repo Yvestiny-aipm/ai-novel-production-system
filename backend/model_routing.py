@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import os
 
-from backend.azure_foundry import AzureFoundryAdapter, foundry_credentials_configured, resolve_foundry_model
+from backend.azure_foundry import (
+    AzureFoundryAdapter,
+    FOUNDRY_ENDPOINT_ENV,
+    foundry_credentials_configured,
+    resolve_foundry_model,
+)
 from backend.harness import ModelProfile
 from backend.siliconflow import (
     DEFAULT_SILICONFLOW_MODEL,
@@ -97,8 +102,11 @@ def missing_runtime_credentials(environ=None, *, task_types=None):
     missing = []
     if PROVIDER_SILICONFLOW in providers and not _env_text(env, "SILICONFLOW_API_KEY"):
         missing.append("SILICONFLOW_API_KEY")
-    if PROVIDER_FOUNDRY in providers and not foundry_credentials_configured(env):
-        missing.append("AZURE_FOUNDRY_CLAUDE_API_KEY or AZURE_FOUNDRY_AUTH=entra")
+    if PROVIDER_FOUNDRY in providers:
+        if not _env_text(env, FOUNDRY_ENDPOINT_ENV):
+            missing.append("AZURE_FOUNDRY_CLAUDE_ENDPOINT")
+        if not foundry_credentials_configured(env):
+            missing.append("AZURE_FOUNDRY_CLAUDE_API_KEY or AZURE_FOUNDRY_AUTH=entra")
     return missing
 
 

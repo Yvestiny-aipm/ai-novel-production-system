@@ -70,8 +70,8 @@ export EXECUTION_MODE=sequential
 export REAL_TEST_DB="$PWD/data/real_test.db"
 # 可选：结构化任务改走 Claude Opus 5，写作仍走 DeepSeek
 export STRUCTURED_PROVIDER=azure_foundry
-export AZURE_FOUNDRY_CLAUDE_ENDPOINT="https://ayw-cuizhiyuan-7093-resource.services.ai.azure.com/anthropic"
-export AZURE_FOUNDRY_CLAUDE_DEPLOYMENT="claude-opus-5-ay-cuizhiyuan"
+export AZURE_FOUNDRY_CLAUDE_ENDPOINT="https://<your-foundry-resource>.services.ai.azure.com/anthropic"
+export AZURE_FOUNDRY_CLAUDE_DEPLOYMENT="<your-foundry-deployment>"
 export AZURE_FOUNDRY_CLAUDE_API_KEY="<your-foundry-api-key>"
 # 若用 Entra 而不用 Key：export AZURE_FOUNDRY_AUTH=entra
 python3 integration/run_real_test.py

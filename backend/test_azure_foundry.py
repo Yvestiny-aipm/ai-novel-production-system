@@ -1,10 +1,12 @@
 import os
 
 from backend.azure_foundry import (
-    AzureFoundryAdapter, DEFAULT_FOUNDRY_DEPLOYMENT, DEFAULT_FOUNDRY_ENDPOINT,
+    AzureFoundryAdapter, DEFAULT_FOUNDRY_DEPLOYMENT,
     build_foundry_kwargs, extract_text_content, finish_reason_from_stop,
     normalize_foundry_base_url, resolve_foundry_auth, split_system_and_messages,
 )
+
+EXAMPLE_FOUNDRY_ENDPOINT = "https://example-resource.services.ai.azure.com/anthropic"
 from backend.siliconflow import ModelResponseParseError
 
 
@@ -43,12 +45,10 @@ class FakeClient:
         return self.message
 
 
-# 1. SDK base_url stays at /anthropic; /v1/messages is stripped.
-assert normalize_foundry_base_url(
-    "https://ayw-cuizhiyuan-7093-resource.services.ai.azure.com/anthropic/v1/messages"
-) == DEFAULT_FOUNDRY_ENDPOINT
-assert normalize_foundry_base_url(DEFAULT_FOUNDRY_ENDPOINT + "/") == DEFAULT_FOUNDRY_ENDPOINT
-assert normalize_foundry_base_url("") == DEFAULT_FOUNDRY_ENDPOINT
+# 1. SDK base_url stays at /anthropic; /v1/messages is stripped. Empty stays empty.
+assert normalize_foundry_base_url(EXAMPLE_FOUNDRY_ENDPOINT + "/v1/messages") == EXAMPLE_FOUNDRY_ENDPOINT
+assert normalize_foundry_base_url(EXAMPLE_FOUNDRY_ENDPOINT + "/") == EXAMPLE_FOUNDRY_ENDPOINT
+assert normalize_foundry_base_url("") == ""
 
 
 # 2. System prompt is split out; user messages stay in order.
@@ -68,12 +68,12 @@ assert messages == [
 request = {
     "task_type": "planning",
     "contract_type": "ScenePlan",
-    "model": "claude-opus-5-ay-cuizhiyuan",
+    "model": "claude-opus-5",
     "max_output_tokens": 2048,
     "input": {"goal": "推进"},
 }
 kwargs = build_foundry_kwargs(request, default_model="unused-default")
-assert kwargs["model"] == "claude-opus-5-ay-cuizhiyuan"
+assert kwargs["model"] == "claude-opus-5"
 assert kwargs["max_tokens"] == 2048
 assert "temperature" not in kwargs
 assert kwargs["thinking"] == {"type": "disabled"}
@@ -82,7 +82,7 @@ assert kwargs["system"]
 assert kwargs["messages"][0]["role"] == "user"
 assert "api_key" not in kwargs
 assert "Authorization" not in kwargs
-assert DEFAULT_FOUNDRY_DEPLOYMENT == "claude-opus-5-ay-cuizhiyuan"
+assert DEFAULT_FOUNDRY_DEPLOYMENT == "claude-opus-5"
 
 
 # 4. Text blocks are joined; thinking blocks are ignored.
@@ -92,11 +92,19 @@ assert finish_reason_from_stop("max_tokens") == "length"
 assert finish_reason_from_stop("end_turn") == "end_turn"
 
 
-# 5. Missing API key fails before any network call.
+# 5. Missing endpoint or API key fails before any network call.
 old = os.environ.pop("AZURE_FOUNDRY_CLAUDE_API_KEY", None)
 try:
     try:
         AzureFoundryAdapter(environ={}).complete({"contract_type": "ScenePlan", "input": {}}, 1)
+    except RuntimeError as error:
+        assert str(error) == "AZURE_FOUNDRY_ENDPOINT_MISSING"
+    else:
+        raise AssertionError("missing Foundry endpoint was not rejected")
+    try:
+        AzureFoundryAdapter(
+            endpoint=EXAMPLE_FOUNDRY_ENDPOINT, environ={}
+        ).complete({"contract_type": "ScenePlan", "input": {}}, 1)
     except RuntimeError as error:
         assert str(error) == "AZURE_FOUNDRY_API_KEY_MISSING"
     else:
@@ -115,12 +123,12 @@ try:
     result = adapter.complete({
         "task_type": "planning",
         "contract_type": "ScenePlan",
-        "model": "claude-opus-5-ay-cuizhiyuan",
+        "model": "claude-opus-5",
         "input": {"goal": "推进"},
     }, 12)
     assert result["contract_type"] == "ScenePlan"
     assert result["payload"]["scene_goal"] == "x"
-    assert client.calls[0]["model"] == "claude-opus-5-ay-cuizhiyuan"
+    assert client.calls[0]["model"] == "claude-opus-5"
     assert secret not in str(client.calls[0])
     assert "api_key" not in client.calls[0]
 finally:

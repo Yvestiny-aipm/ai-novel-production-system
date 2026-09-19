@@ -5,8 +5,7 @@ import os
 
 from backend.siliconflow import build_chat_messages, parse_contract_content
 
-DEFAULT_FOUNDRY_ENDPOINT = "https://ayw-cuizhiyuan-7093-resource.services.ai.azure.com/anthropic"
-DEFAULT_FOUNDRY_DEPLOYMENT = "claude-opus-5-ay-cuizhiyuan"
+DEFAULT_FOUNDRY_DEPLOYMENT = "claude-opus-5"
 DEFAULT_FOUNDRY_TOKEN_SCOPE = "https://ai.azure.com/.default"
 FOUNDRY_API_KEY_ENV = "AZURE_FOUNDRY_CLAUDE_API_KEY"
 FOUNDRY_ENDPOINT_ENV = "AZURE_FOUNDRY_CLAUDE_ENDPOINT"
@@ -37,14 +36,14 @@ def _env_text(environ, name):
 def normalize_foundry_base_url(url):
     text = (url or "").strip()
     if not text:
-        return DEFAULT_FOUNDRY_ENDPOINT
+        return ""
     while text.endswith("/"):
         text = text[:-1]
     if text.endswith("/v1/messages"):
         text = text[: -len("/v1/messages")]
     elif text.endswith("/v1"):
         text = text[: -len("/v1")]
-    return text or DEFAULT_FOUNDRY_ENDPOINT
+    return text
 
 
 def resolve_foundry_auth(environ=None):
@@ -192,7 +191,7 @@ class AzureFoundryAdapter:
         self.environ = environ if environ is not None else os.environ
         self.api_key_env = api_key_env
         self.base_url = normalize_foundry_base_url(
-            endpoint or _env_text(self.environ, FOUNDRY_ENDPOINT_ENV) or DEFAULT_FOUNDRY_ENDPOINT
+            endpoint or _env_text(self.environ, FOUNDRY_ENDPOINT_ENV)
         )
         self.model = (
             model
@@ -220,6 +219,8 @@ class AzureFoundryAdapter:
         timeout = timeout_seconds or self.timeout
         if self._client is not None and (self._client_factory is None or self._client_timeout == timeout):
             return self._client
+        if not self.base_url:
+            raise RuntimeError("AZURE_FOUNDRY_ENDPOINT_MISSING")
         factory = self._client_factory or create_foundry_client
         if self.auth_mode == "entra":
             client = factory(base_url=self.base_url, timeout=timeout, token_provider=self._token_provider())

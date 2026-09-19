@@ -41,27 +41,38 @@ assert resolve_routed_model("writing", foundry_env) == "vendor/writing"
 
 
 # 4. All-Foundry routing uses the deployment name unless overridden.
-all_foundry = {"MODEL_PROVIDER": "azure_foundry", "AZURE_FOUNDRY_CLAUDE_DEPLOYMENT": "claude-opus-5-ay-cuizhiyuan"}
+all_foundry = {"MODEL_PROVIDER": "azure_foundry", "AZURE_FOUNDRY_CLAUDE_DEPLOYMENT": "claude-opus-5-example"}
 assert resolve_task_provider("writing", all_foundry) == PROVIDER_FOUNDRY
-assert resolve_routed_model("writing", all_foundry) == "claude-opus-5-ay-cuizhiyuan"
+assert resolve_routed_model("writing", all_foundry) == "claude-opus-5-example"
 
 
-# 5. Runtime credential gate: Foundry-only accepts entra; mixed still needs SiliconFlow.
+# 5. Runtime credential gate: Foundry needs endpoint; entra skips key; mixed still needs SiliconFlow.
 assert missing_runtime_credentials({}, task_types=TYPES) == ["SILICONFLOW_API_KEY"]
 assert missing_runtime_credentials(
     {"MODEL_PROVIDER": "azure_foundry"}, task_types=TYPES
-) == ["AZURE_FOUNDRY_CLAUDE_API_KEY or AZURE_FOUNDRY_AUTH=entra"]
+) == [
+    "AZURE_FOUNDRY_CLAUDE_ENDPOINT",
+    "AZURE_FOUNDRY_CLAUDE_API_KEY or AZURE_FOUNDRY_AUTH=entra",
+]
 assert missing_runtime_credentials(
-    {"MODEL_PROVIDER": "azure_foundry", "AZURE_FOUNDRY_AUTH": "entra"},
+    {
+        "MODEL_PROVIDER": "azure_foundry",
+        "AZURE_FOUNDRY_CLAUDE_ENDPOINT": "https://example-resource.services.ai.azure.com/anthropic",
+        "AZURE_FOUNDRY_AUTH": "entra",
+    },
     task_types=TYPES,
 ) == []
 assert missing_runtime_credentials(
     {"STRUCTURED_PROVIDER": "azure_foundry", "AZURE_FOUNDRY_CLAUDE_API_KEY": "key"},
     task_types=TYPES,
-) == ["SILICONFLOW_API_KEY"]
+) == ["SILICONFLOW_API_KEY", "AZURE_FOUNDRY_CLAUDE_ENDPOINT"]
 assert missing_runtime_credentials(
-    {"STRUCTURED_PROVIDER": "azure_foundry", "AZURE_FOUNDRY_CLAUDE_API_KEY": "key",
-     "SILICONFLOW_API_KEY": "sf"},
+    {
+        "STRUCTURED_PROVIDER": "azure_foundry",
+        "AZURE_FOUNDRY_CLAUDE_ENDPOINT": "https://example-resource.services.ai.azure.com/anthropic",
+        "AZURE_FOUNDRY_CLAUDE_API_KEY": "key",
+        "SILICONFLOW_API_KEY": "sf",
+    },
     task_types=TYPES,
 ) == []
 
