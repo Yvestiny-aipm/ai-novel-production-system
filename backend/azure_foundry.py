@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import os
 
-from backend.siliconflow import build_chat_messages, parse_contract_content
+from backend.siliconflow import (ModelResponseParseError, build_chat_messages,
+    parse_contract_content, retry_memory_refusal)
 
 DEFAULT_FOUNDRY_DEPLOYMENT = "claude-opus-5"
 DEFAULT_FOUNDRY_TOKEN_SCOPE = "https://ai.azure.com/.default"
@@ -138,6 +139,42 @@ def extract_text_content(message):
     return "".join(texts)
 
 
+def _block_text(block, *names):
+    for name in names:
+        if isinstance(block, dict):
+            value = block.get(name)
+        else:
+            value = getattr(block, name, None)
+        if value:
+            return str(value)
+    return ""
+
+
+def extract_refusal_reason(message):
+    """Keep refusal-block text for audit. extract_text_content still drops those blocks."""
+    reasons = []
+    top = _block_text(message, "refusal")
+    if top:
+        reasons.append(top)
+    blocks = getattr(message, "content", None)
+    if blocks is None and isinstance(message, dict):
+        blocks = message.get("content")
+    if isinstance(blocks, str):
+        return "\n".join(reasons) or None
+    for block in blocks or []:
+        if isinstance(block, str):
+            continue
+        btype = getattr(block, "type", None)
+        if btype is None and isinstance(block, dict):
+            btype = block.get("type")
+        if btype != "refusal":
+            continue
+        text = _block_text(block, "refusal", "text")
+        if text:
+            reasons.append(text)
+    return "\n".join(reasons) or None
+
+
 def usage_from_message(message):
     usage = getattr(message, "usage", None)
     if usage is None and isinstance(message, dict):
@@ -243,11 +280,17 @@ class AzureFoundryAdapter:
         stop_reason = getattr(message, "stop_reason", None)
         if stop_reason is None and isinstance(message, dict):
             stop_reason = message.get("stop_reason")
-        if isinstance(content, str):
-            return parse_contract_content(
-                content,
-                finish_reason=finish_reason_from_stop(stop_reason),
-                usage=usage_from_message(message),
-                expected=request.get("contract_type"),
-            )
+        finish_reason = finish_reason_from_stop(stop_reason)
+        refusal_reason = extract_refusal_reason(message)
+        try:
+            if finish_reason == "refusal" or isinstance(content, str):
+                return parse_contract_content(
+                    content if isinstance(content, str) else "",
+                    finish_reason=finish_reason,
+                    usage=usage_from_message(message),
+                    expected=request.get("contract_type"),
+                    refusal_reason=refusal_reason,
+                )
+        except ModelResponseParseError as error:
+            return retry_memory_refusal(self, error, request, timeout_seconds)
         return message

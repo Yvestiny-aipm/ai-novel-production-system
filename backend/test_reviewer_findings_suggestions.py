@@ -5,7 +5,8 @@ import tempfile
 from pathlib import Path
 
 from backend.harness import REVIEWER_PROMPT_VERSION, required_fields_validator, ContractFormatError
-from backend.siliconflow import reviewer_findings_instruction, reviewer_style_instruction
+from backend.siliconflow import (reviewer_findings_instruction, reviewer_style_instruction,
+    writing_quality_edit_instruction)
 from integration.run_real_test import aggregate_quality, run
 
 
@@ -307,6 +308,115 @@ with tempfile.TemporaryDirectory() as directory:
     assert "hc_planted_reviewer_v5" not in (result["scenes"][0].get("reused_calls") or [])
     assert all(call["prompt_version"] == REVIEWER_PROMPT_VERSION
                for call in second.calls if call["task_type"].startswith("review_"))
+
+
+# Arbiter-stripped findings must be restored into the saved report and Writing prompt.
+STRIPPED_WORLD = "设定外出现手枪和巨物"
+STRIPPED_PLOT = "灯塔生成新纸条缺少依据"
+STRIPPED_SUGGESTION = "可保留档案室气味"
+
+
+class StrippedArbiterAdapter(ReviewAdapter):
+    def complete(self, request, timeout_seconds):
+        if request["task_type"] == "arbiter":
+            self.calls.append(request)
+            return {"contract_type": "QualityReport", "contract_version": "v1", "payload": {
+                "review_completion_status": "completed",
+                "reviewer_results": [
+                    {"reviewer_role": "world_consistency", "result": "failed", "findings": [], "suggestions": [],
+                     "issue_count": 1, "severity": "serious", "impact_scope": "local",
+                     "true_conflict_candidate": False, "scene_state": STATE},
+                    {"reviewer_role": "character_plot", "result": "failed", "findings": [], "suggestions": [],
+                     "issue_count": 1, "severity": "ordinary", "impact_scope": "local",
+                     "true_conflict_candidate": False, "scene_state": STATE},
+                    {"reviewer_role": "language_experience", "result": "passed", "findings": [], "suggestions": [],
+                     "issue_count": 0, "severity": "ordinary", "impact_scope": "local",
+                     "true_conflict_candidate": False, "scene_state": STATE},
+                ],
+                "deduped_issue_count": 2, "ordinary_issue_count": 1, "serious_issue_count": 1,
+                "has_true_conflict": False, "needs_arbiter": False, "routing_recommendation": "rewrite",
+                "accepted_scene_state": STATE, "status": "failed",
+            }}
+        return super().complete(request, timeout_seconds)
+
+
+with tempfile.TemporaryDirectory() as directory:
+    path = Path(directory) / "arbiter-restore-findings.db"
+    adapter = StrippedArbiterAdapter(
+        world=reviewer("world_consistency", result="failed", findings=[STRIPPED_WORLD],
+                       issue_count=1, severity="serious"),
+        plot=reviewer("character_plot", result="failed", findings=[STRIPPED_PLOT], issue_count=1),
+        style=reviewer("language_experience", suggestions=[STRIPPED_SUGGESTION]),
+    )
+    run(db_path=path, adapter=adapter, execution_mode="sequential")
+    writing = [call for call in adapter.calls if call["task_type"] == "writing"]
+    assert len(writing) >= 2
+    feedback = writing[1]["input"]["quality_revision_feedback"]
+    instruction = writing_quality_edit_instruction(feedback)
+    assert STRIPPED_WORLD in instruction
+    assert STRIPPED_PLOT in instruction
+    assert "世界/连续性问题：需修正" not in instruction
+    assert "人物/剧情问题：需修正" not in instruction
+    blob, _, _ = report_blob(path)
+    payloads = reviewer_payloads(blob)
+    by_role = {(item.get("payload") or item).get("reviewer_role"): (item.get("payload") or item)
+               for item in payloads}
+    assert STRIPPED_WORLD in (by_role["world_consistency"].get("findings") or [])
+    assert STRIPPED_PLOT in (by_role["character_plot"].get("findings") or [])
+    assert STRIPPED_SUGGESTION in (by_role["language_experience"].get("suggestions") or [])
+
+
+# Dict findings must surface issue/detail/suggested_fix, not str(dict).
+dict_finding_instruction = writing_quality_edit_instruction({
+    "reviewer_findings": [{
+        "reviewer_role": "world_consistency", "result": "failed", "issue_count": 1,
+        "findings": [{"issue": "设定外手枪", "detail": "正文出现未铺垫武器", "suggested_fix": "删除手枪"}],
+    }],
+})
+assert "设定外手枪" in dict_finding_instruction
+assert "正文出现未铺垫武器" in dict_finding_instruction
+assert "删除手枪" in dict_finding_instruction
+assert "{'issue'" not in dict_finding_instruction
+assert "必须改写或删除" in dict_finding_instruction
+assert "点名" in dict_finding_instruction
+assert "保留已通过内容" not in dict_finding_instruction
+assert "禁止原样返回" in dict_finding_instruction
+assert "禁止只改结构化字段或word_count" in dict_finding_instruction
+
+
+class ShortAfterFailedReviewAdapter(ReviewAdapter):
+    def complete(self, request, timeout_seconds):
+        if request["task_type"] == "writing":
+            self.calls.append(request)
+            self.writes += 1
+            if self.writes == 2:
+                return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
+                    "text": "短" * 400, "word_count": 400, "target_word_count": 1250,
+                    "complete": True, "writer_self_check": {"complete": True},
+                }}
+            payload = long_prose()
+            payload["payload"]["text"] = LONG_PROSE + f"第{self.writes}稿。"
+            return payload
+        return super().complete(request, timeout_seconds)
+
+
+# After a short draft, the next writing call still carries the earlier failed QualityReport.
+with tempfile.TemporaryDirectory() as directory:
+    path = Path(directory) / "short-keeps-quality.db"
+    adapter = ShortAfterFailedReviewAdapter(world=reviewer(
+        "world_consistency", result="failed", findings=["设定外出现未铺垫武器"], issue_count=1,
+    ))
+    run(db_path=path, adapter=adapter, execution_mode="sequential")
+    writing = [call for call in adapter.calls if call["task_type"] == "writing"]
+    assert len(writing) >= 3
+    assert "quality_revision_feedback" in writing[1]["input"]
+    assert writing[1]["input"]["quality_revision_feedback"]["reviewer_findings"]
+    third = writing[2]["input"]
+    assert "revision_feedback" in third
+    assert third["revision_feedback"]["adjustment_direction"] == "expand"
+    assert "quality_revision_feedback" in third
+    findings = third["quality_revision_feedback"].get("reviewer_findings") or []
+    assert any("设定外出现未铺垫武器" in str(item.get("findings")) for item in findings)
 
 
 print("reviewer findings suggestions ok")

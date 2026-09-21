@@ -6,13 +6,13 @@ orchestrator uses this module's count for every workflow decision.
 from __future__ import annotations
 
 MIN_CHARACTER_COUNT = 1000
-MAX_CHARACTER_COUNT = 1500
+MAX_CHARACTER_COUNT = 2300
 MAX_LENGTH_FAILURES_IN_PLAN = 4
 LENGTH_FAILURE_REASONS = frozenset({"empty_text", "under_length", "over_length"})
 DEFAULT_TARGET_WORD_COUNT = 1250
 PREFERRED_SOFT_MIN = 1200
 PREFERRED_SOFT_MAX = 1350
-WRITING_PROMPT_VERSION = "prose_quality_v5"
+WRITING_PROMPT_VERSION = "prose_quality_v8"
 
 
 def actual_character_count(text: str | None) -> int:
@@ -57,7 +57,7 @@ def length_revision_feedback(previous_draft: dict) -> dict | None:
         required_min = max(0, actual - MAX_CHARACTER_COUNT)
         required_max = max(required_min, actual - MIN_CHARACTER_COUNT)
         preferred_delta = actual - DEFAULT_TARGET_WORD_COUNT
-    return {
+    payload = {
         "failure_type": "prose_length",
         "previous_draft_id": previous_draft["draft_id"],
         "previous_actual_character_count": actual,
@@ -75,6 +75,13 @@ def length_revision_feedback(previous_draft: dict) -> dict | None:
         "content_attempt_in_plan": int(previous_draft.get("content_attempt_in_plan") or 0),
         "previous_text": previous_draft.get("text") or "",
     }
+    reported = previous_draft.get("model_reported_word_count")
+    if reported is not None and str(reported).strip() != "":
+        try:
+            payload["previous_model_reported_word_count"] = int(reported)
+        except (TypeError, ValueError):
+            pass
+    return payload
 
 
 def planning_length_rework_feedback(failed_drafts: list[dict]) -> dict | None:

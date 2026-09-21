@@ -9,6 +9,11 @@ from backend.azure_foundry import (
     foundry_credentials_configured,
     resolve_foundry_model,
 )
+from backend.deepseek import (
+    PROVIDER_DEEPSEEK,
+    DeepSeekOfficialAdapter,
+    resolve_deepseek_model,
+)
 from backend.harness import ModelProfile
 from backend.siliconflow import (
     DEFAULT_SILICONFLOW_MODEL,
@@ -27,6 +32,8 @@ PROVIDER_ALIASES = {
     "azure": PROVIDER_FOUNDRY,
     "azure_foundry": PROVIDER_FOUNDRY,
     "siliconflow": PROVIDER_SILICONFLOW,
+    "deepseek": PROVIDER_DEEPSEEK,
+    "deepseek_official": PROVIDER_DEEPSEEK,
 }
 TASK_PROVIDER_ENV = {
     "writing": "WRITING_PROVIDER",
@@ -74,6 +81,8 @@ def resolve_routed_model(task_type, environ=None, *, default=None, provider=None
     chosen = provider or resolve_task_provider(task_type, env)
     if chosen == PROVIDER_FOUNDRY:
         return resolve_foundry_model(task_type, env, default=default)
+    if chosen == PROVIDER_DEEPSEEK:
+        return resolve_deepseek_model(task_type, env, default=default)
     return resolve_task_model(task_type, env, default=default or DEFAULT_SILICONFLOW_MODEL)
 
 
@@ -92,6 +101,8 @@ def create_adapter(provider, *, siliconflow_adapter=None, environ=None):
         return siliconflow_adapter or SiliconFlowAdapter()
     if provider == PROVIDER_FOUNDRY:
         return AzureFoundryAdapter(environ=environ)
+    if provider == PROVIDER_DEEPSEEK:
+        return DeepSeekOfficialAdapter(environ=environ)
     raise ValueError(f"UNKNOWN_PROVIDER:{provider}")
 
 
@@ -102,6 +113,8 @@ def missing_runtime_credentials(environ=None, *, task_types=None):
     missing = []
     if PROVIDER_SILICONFLOW in providers and not _env_text(env, "SILICONFLOW_API_KEY"):
         missing.append("SILICONFLOW_API_KEY")
+    if PROVIDER_DEEPSEEK in providers and not _env_text(env, "DEEPSEEK_API_KEY"):
+        missing.append("DEEPSEEK_API_KEY")
     if PROVIDER_FOUNDRY in providers:
         if not _env_text(env, FOUNDRY_ENDPOINT_ENV):
             missing.append("AZURE_FOUNDRY_CLAUDE_ENDPOINT")
@@ -141,7 +154,7 @@ def build_harness_setup(
             provider,
             resolve_routed_model(role, environ, provider=provider),
             timeout_seconds=resolve_task_timeout(role, timeout_env),
-            technical_retries=0,
+            technical_retries=1,
             max_output_tokens=resolve_max_output_tokens(provider, environ),
             prompt_version=versions.get(role, "v1"),
         )

@@ -1,13 +1,16 @@
 """Resume durable checkpoints; only an explicit rework allocates a new revision."""
 import json
 import os
+import sqlite3
 import time
 import uuid
 
 from backend.context_pack import ContextPackService
 from backend.content_similarity import check_draft_repetition, check_plan_repetition
-from backend.progression import (PROGRESSION_RESULT_KEYS, apply_to_quality, progression_baseline_from_state,
-    verify_progression)
+from backend.character_canon import CHARACTER_CANON_REASON, validate_character_canon
+from backend.setting_canon import SETTING_CANON_REASON, validate_setting_canon
+from backend.progression import (PROGRESSION_RESULT_KEYS, apply_to_quality, plan_before_state_conflict_items,
+    progression_baseline_from_state, verify_progression)
 from backend.harness import (Harness, required_fields_validator, ContractFormatError,
     ARBITER_PROMPT_VERSION, PLANNING_PROMPT_VERSION, PLANNING_QUALITY_REASONS, REVIEWER_PROMPT_VERSION,
     REVIEWER_ROLE_BY_TASK, classify_scene_plan_quality, normalize_reviewer_evidence,
@@ -15,7 +18,7 @@ from backend.harness import (Harness, required_fields_validator, ContractFormatE
     validate_scene_plan_against_input, validate_reviewer_result_against_input,
     validate_reviewer_result_for_task)
 from backend.model_routing import build_harness_setup
-from integration.seed_real_test import seed
+from integration.seed_real_test import auto_confirm_enabled, resolve_scene_count, seed
 from backend.prose_length import (LENGTH_FAILURE_REASONS, MAX_LENGTH_FAILURES_IN_PLAN,
     WRITING_PROMPT_VERSION, length_revision_feedback)
 from backend.progression import quality_revision_feedback, reviewer_findings_from_payload
@@ -152,7 +155,7 @@ def queue_technical_exception(db, task_id, *, source_node, error, call_id=None, 
             harness_error = {'error': harness_error}
         if code == 'TECHNICAL_ERROR':
             stored = harness_error.get('error_code') or harness_error.get('error')
-            if stored in ('MODEL_RESPONSE_JSON_INVALID', 'MODEL_OUTPUT_TRUNCATED'):
+            if stored in ('MODEL_RESPONSE_JSON_INVALID', 'MODEL_OUTPUT_TRUNCATED', 'MODEL_RESPONSE_REFUSED'):
                 code = stored
             _, harness_message = _error_from_harness(harness_row)
             if harness_message:
@@ -353,8 +356,33 @@ def reclassify_orphaned_planning_exception(db, task_id, out=None):
         task = one(db, 'select * from task_states where task_id=?', (task_id,))
     if not task or task.get('status') != 'exception_pending':
         return False
-    call = _latest_planning_contract_invalid(db, task_id)
-    if not call:
+    if existing and existing.get('source_node') not in (None, '', 'planning'):
+        return False
+    if existing and existing.get('error_code') in ('MODEL_RESPONSE_JSON_INVALID', 'MODEL_OUTPUT_TRUNCATED', 'MODEL_RESPONSE_REFUSED'):
+        return False
+    call = None
+    exception_call_id = None
+    if existing:
+        try:
+            blob = json.loads(existing.get('details_json') or '{}')
+        except json.JSONDecodeError:
+            blob = {}
+        if isinstance(blob, dict):
+            exception_call_id = blob.get('harness_call_id')
+    if exception_call_id:
+        call = one(db, 'select * from harness_calls where harness_call_id=?', (exception_call_id,))
+    else:
+        call = _latest_planning_contract_invalid(db, task_id)
+    if not call or call.get('agent_type') != 'planning' or call.get('status') != 'contract_invalid':
+        return False
+    later_success = one(
+        db,
+        """select harness_call_id from harness_calls
+           where task_id=? and agent_type='planning' and status='success'
+             and coalesce(started_at,'') > coalesce(?, '')""",
+        (task_id, call.get('started_at')),
+    )
+    if later_success:
         return False
     details = planning_quality_details_from_call(call)
     if not details:
@@ -662,11 +690,76 @@ def apply_length_failure(db, task_id, reason, draft_id):
     return 'reworking_writing'
 
 
+def _reviewer_item_payload(item):
+    if not isinstance(item, dict):
+        return {}
+    payload = item.get('payload') if isinstance(item.get('payload'), dict) else item
+    return payload if isinstance(payload, dict) else {}
+
+
+def _nonempty_reviewer_list(value):
+    if isinstance(value, list):
+        return [part for part in value if str(part).strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def _copy_reviewer_list(value):
+    if isinstance(value, list):
+        return list(value)
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def restore_reviewer_findings(arbiter_results, original_reviews):
+    """Keep original reviewer findings/suggestions when the Arbiter returns empty lists."""
+    originals_by_role = {}
+    for item in original_reviews or []:
+        role = _reviewer_item_payload(item).get('reviewer_role')
+        if role:
+            originals_by_role[role] = item
+    if not arbiter_results:
+        return list(original_reviews or [])
+
+    def has_findings(items):
+        return any(_nonempty_reviewer_list(_reviewer_item_payload(item).get('findings')) for item in items)
+
+    restored = []
+    seen = set()
+    for item in arbiter_results:
+        payload = dict(_reviewer_item_payload(item))
+        role = payload.get('reviewer_role')
+        original = _reviewer_item_payload(originals_by_role.get(role)) if role else {}
+        if not _nonempty_reviewer_list(payload.get('findings')) and _nonempty_reviewer_list(original.get('findings')):
+            payload['findings'] = _copy_reviewer_list(original.get('findings'))
+            if not payload.get('issue_count'):
+                payload['issue_count'] = original.get('issue_count') or len(_nonempty_reviewer_list(payload['findings']))
+            if payload.get('result') != 'failed':
+                payload['result'] = original.get('result') or 'failed'
+        if not _nonempty_reviewer_list(payload.get('suggestions')) and _nonempty_reviewer_list(original.get('suggestions')):
+            payload['suggestions'] = _copy_reviewer_list(original.get('suggestions'))
+        if role:
+            seen.add(role)
+        if isinstance(item, dict) and isinstance(item.get('payload'), dict):
+            restored.append({**item, 'payload': payload})
+        else:
+            restored.append(payload)
+    for role, item in originals_by_role.items():
+        if role not in seen:
+            restored.append(item)
+    if not has_findings(restored) and has_findings(original_reviews or []):
+        return list(original_reviews)
+    return restored
+
+
 class SceneRecovery:
     def __init__(self, db, harness, book, number, out):
         self.db, self.harness, self.book, self.number, self.out = db, harness, book, number, out
         self.scene, self.task = out['scene_id'], out['task_id']
-        self.chapter = book+'_chapter_1'
+        scene_row = one(db, 'select chapter_id from scenes where scene_id=?', (self.scene,))
+        self.chapter = scene_row['chapter_id'] if scene_row else book+'_chapter_1'
         self.node = 'planning'
         self.out.setdefault('reviewer_correction_called', False)
         self.out.setdefault('reviewer_correction_succeeded', False)
@@ -793,6 +886,13 @@ class SceneRecovery:
                     'accepted_scene_state','synced_progression_states','passed_review'):
             self.out.pop(key, None)
 
+    def _same_scene_duplicate_hash(self, draft_hash):
+        if not draft_hash or not self.out.get('draft_id'):
+            return None
+        return one(self.db,
+                   'select draft_id from prose_drafts where scene_id=? and draft_hash=? and draft_id<>? limit 1',
+                   (self.scene, draft_hash, self.out['draft_id']))
+
     def _writing_length_feedback(self, plan_version):
         previous = one(self.db,'select * from prose_drafts where scene_id=? and plan_version=? order by draft_version desc limit 1',(self.scene,plan_version))
         return length_revision_feedback(previous) if previous else None
@@ -806,16 +906,37 @@ class SceneRecovery:
             return first['payload']
         return first if isinstance(first, dict) else {}
 
-    def _writing_quality_feedback(self, plan_version, planning):
-        previous = one(self.db,'select * from prose_drafts where scene_id=? and plan_version=? order by draft_version desc limit 1',(self.scene,plan_version))
-        if not previous or previous.get('length_validation_status') != 'passed':
-            return None
-        report = one(self.db,'select * from quality_reports where draft_id=? order by review_attempt desc limit 1',(previous['draft_id'],))
+    def _failed_quality_report_for_draft(self, draft_id):
+        report = one(self.db,'select * from quality_reports where draft_id=? order by review_attempt desc limit 1',(draft_id,))
         if not report:
             return None
         payload = self._quality_payload_from_report(report)
         if report.get('status') != 'failed' and payload.get('status') != 'failed':
             return None
+        return report, payload
+
+    def _writing_quality_feedback(self, plan_version, planning):
+        previous = one(self.db,'select * from prose_drafts where scene_id=? and plan_version=? order by draft_version desc limit 1',(self.scene,plan_version))
+        source = None
+        found = None
+        if previous and previous.get('length_validation_status') == 'passed':
+            found = self._failed_quality_report_for_draft(previous['draft_id'])
+            if found:
+                source = previous
+        if source is None:
+            source = one(
+                self.db,
+                'select d.* from prose_drafts d join quality_reports q on q.draft_id=d.draft_id '
+                'where d.scene_id=? and d.plan_version=? and d.length_validation_status=? and q.status=? '
+                'order by d.draft_version desc, q.review_attempt desc limit 1',
+                (self.scene, plan_version, 'passed', 'failed'),
+            )
+            if not source:
+                return None
+            found = self._failed_quality_report_for_draft(source['draft_id'])
+        if not found:
+            return None
+        report, payload = found
         findings = reviewer_findings_from_payload(payload)
         progression_status = payload.get('progression_status')
         missing = payload.get('missing_progression_items') or []
@@ -824,7 +945,7 @@ class SceneRecovery:
             missing = []
             reason = None
         return quality_revision_feedback(
-            previous_draft_id=previous['draft_id'], previous_text=previous.get('text') or '',
+            previous_draft_id=source['draft_id'], previous_text=source.get('text') or '',
             plan_id=self.out.get('plan_id') or planning.get('payload', {}).get('plan_id'),
             plan_version=plan_version,
             reviewer_findings=findings,
@@ -853,6 +974,29 @@ class SceneRecovery:
             self.db, self.book, self.chapter, self.scene, response,
             getattr(error, 'call_id', None) or 'rejected_plan', story_version, plan_version,
         )
+
+    def _planning_revision_feedback(self, directive, planning_input):
+        """Quality-rework only. First planning and content replans omit this field."""
+        if not isinstance(directive, dict) or directive.get('content_failure'):
+            return None
+        failed_pv = directive.get('failed_plan_version')
+        reason = directive.get('reason')
+        if failed_pv is None or not reason:
+            return None
+        failed = one(self.db, 'select payload_json from scene_plans where scene_id=? and plan_version=?',
+                     (self.scene, failed_pv))
+        requirements = []
+        if failed:
+            payload = json.loads(failed['payload_json'] or '{}')
+            if isinstance(payload, dict):
+                requirements = payload.get('progression_requirements') or []
+        return {
+            'reason': reason,
+            'failed_plan_version': int(failed_pv),
+            'failed_items': plan_before_state_conflict_items(
+                requirements, planning_input.get('progression_baseline') or {},
+            ),
+        }
 
     def _route_planning_failure(self, reason, failed_plan_version, error=None):
         missing, empty = planning_quality_field_lists(error)
@@ -897,6 +1041,9 @@ class SceneRecovery:
         planning_input={'scene_number':self.number,'context_pack':cp}
         if self.number > 1:
             planning_input['progression_baseline']=progression_baseline_from_state(previous)
+        revision = self._planning_revision_feedback(directive, planning_input)
+        if revision:
+            planning_input['planning_revision_feedback'] = revision
         if plan:
             try:
                 planning = envelope('ScenePlan',json.loads(plan['payload_json']))
@@ -961,6 +1108,11 @@ class SceneRecovery:
                         target_word_count=length['target_word_count'],
                         length_validation_status=length['length_validation_status'],
                         length_validation_reason=length['length_validation_reason'])
+        # Same-scene exact copies are duplicate_draft_content even when short.
+        # Do not spend a length attempt on an unchanged resubmission.
+        if self._same_scene_duplicate_hash(dh):
+            self.out.update(passed_review=False, rework=True, repetition_rework=True)
+            return self._route_content_failure('duplicate_draft_content', draft_id=self.out['draft_id'], force_block=True)
         # This deterministic gate intentionally precedes all reviewers and
         # memory processing.  It is a content rework, never a technical error.
         if length['length_validation_status'] != 'passed':
@@ -984,6 +1136,20 @@ class SceneRecovery:
             self.out.update(passed_review=False, rework=True, repetition_rework=True)
             reason = 'draft_repetition:' + json.dumps(repetition['failures'], ensure_ascii=False)
             return self._route_content_failure(reason, draft_id=self.out['draft_id'])
+        canon = validate_character_canon(writing['payload']['text'])
+        self.out['character_canon_status'] = canon['status']
+        if canon['status'] == 'failed':
+            self.out.update(passed_review=False, rework=True,
+                            character_canon_failure_reason=CHARACTER_CANON_REASON,
+                            character_canon_conflicts=canon.get('conflicts') or [])
+            return self._route_content_failure(CHARACTER_CANON_REASON, draft_id=self.out['draft_id'])
+        setting = validate_setting_canon(writing['payload']['text'])
+        self.out['setting_canon_status'] = setting['status']
+        if setting['status'] == 'failed':
+            self.out.update(passed_review=False, rework=True,
+                            setting_canon_failure_reason=SETTING_CANON_REASON,
+                            setting_canon_conflicts=setting.get('conflicts') or [])
+            return self._route_content_failure(SETTING_CANON_REASON, draft_id=self.out['draft_id'])
         self.node = 'reviewing'
         report = one(self.db,'select * from quality_reports where draft_id=? order by review_attempt desc limit 1',(self.out['draft_id'],))
         if report:
@@ -1011,8 +1177,8 @@ class SceneRecovery:
                     'draft':writing,'reviewer_results':reviews,'preliminary_quality':preliminary,
                     'progression_requirements':planning['payload']['progression_requirements'],
                 })['response']
-                if not quality['payload'].get('reviewer_results'):
-                    quality['payload']['reviewer_results'] = original_reviews
+                quality['payload']['reviewer_results'] = restore_reviewer_findings(
+                    quality['payload'].get('reviewer_results') or [], original_reviews)
                 self.out['arbiter_succeeded'] = True
                 arb = [quality]
             report_id=f'{self.scene}_report_v{self.out["draft_id"].rsplit("_v",1)[-1]}'
@@ -1056,6 +1222,25 @@ class SceneRecovery:
         self.node = 'human_confirmation'; return 'waiting_confirmation'
 
 
+def confirm_pending_memory(db, scene_id, actor_id='real_test_operator'):
+    from backend.memory_confirmation import confirm_proposal
+
+    old_factory = db.row_factory
+    db.row_factory = sqlite3.Row
+    try:
+        rows = db.execute(
+            "select proposal_id from memory_proposals where scene_id=? and status='pending' and write_policy='human_confirmation'",
+            (scene_id,),
+        ).fetchall()
+        confirmed = []
+        for row in rows:
+            confirm_proposal(db, row['proposal_id'], actor_id)
+            confirmed.append(row['proposal_id'])
+        return confirmed
+    finally:
+        db.row_factory = old_factory
+
+
 def _prompt_version(role):
     if role == 'writing':
         return WRITING_PROMPT_VERSION
@@ -1070,8 +1255,9 @@ def _prompt_version(role):
 
 def run_recovery(path, adapter, mode, *, mock=False, model_environ=None, timeout_environ=None):
     if mode not in ('sequential','independent_test'): raise ValueError('INVALID_EXECUTION_MODE')
-    db, book = seed(path)
     env = model_environ if model_environ is not None else ({} if mock else os.environ)
+    scene_count = resolve_scene_count(env)
+    db, book = seed(path, scene_count=scene_count)
     timeout_env = timeout_environ if timeout_environ is not None else env
     routes, adapters = build_harness_setup(
         TYPES, env, mock=mock, siliconflow_adapter=adapter, timeout_environ=timeout_env,
@@ -1080,12 +1266,22 @@ def run_recovery(path, adapter, mode, *, mock=False, model_environ=None, timeout
     harness = Harness(path, routes, adapters)
     start = time.time(); results = []
     try:
-        for number in range(1,6):
+        for number in range(1, scene_count + 1):
             scene = f'{book}_scene_{number}'; task_id = scene+'_task'
             task = one(db,'select * from task_states where task_id=?',(task_id,))
             out = {'scene_id':scene,'task_id':task_id,'execution_mode':mode,'calls':[],'reused_calls':[],'rework':False,'arbiter_called':False,'arbiter_succeeded':False,'reviewer_correction_called':False,'reviewer_correction_succeeded':False,'corrected_reviewer_role':None,'reviewer_normalization_applied':False,'reviewer_normalization_rule':None,'reviewer_evidence_normalization_applied':False,'reviewer_evidence_normalization_count':0,'reviewer_role_normalization_applied':False,'reviewer_role_normalization_count':0,'length_failure_count_in_plan':0,'length_failure_count_total':0,'semantic_failure_count_in_plan':0,'semantic_failure_count_total':0,'proposal_id':None,'formal_memory_written':False,'final_status':task['status'],'current_node':task['current_node']}
             results.append(out)
             if task['status']=='completed': out['skipped_existing']=True; out.update(failure_count_snapshot(db, task_id)); continue
+            if task['status']=='waiting_confirmation' and auto_confirm_enabled(env):
+                confirmed = confirm_pending_memory(db, scene)
+                if confirmed:
+                    task = one(db,'select * from task_states where task_id=?',(task_id,))
+                    out['auto_confirmed'] = True
+                    out['auto_confirmed_proposals'] = confirmed
+                    out['final_status'] = task['status']
+                    out['current_node'] = task['current_node']
+                    out.update(failure_count_snapshot(db, task_id))
+                    continue
             if task['status'] in ('waiting_confirmation','blocked','paused','cancelled','skipped'):
                 out['paused_existing']=True; out.update(failure_count_snapshot(db, task_id)); continue
             if mode=='sequential' and not prior_scenes_completed(db,book,number):
@@ -1109,8 +1305,18 @@ def run_recovery(path, adapter, mode, *, mock=False, model_environ=None, timeout
                     checkpoint=getattr(recovery, 'checkpoint', None), out=out)
                 out.update(final_status='exception_pending',current_node='exception_handling',
                            technical_error=str(exc),failed_node=recovery.node,exception_id=exception_id)
+            if out.get('final_status') == 'waiting_confirmation' and auto_confirm_enabled(env):
+                confirmed = confirm_pending_memory(db, scene)
+                if confirmed:
+                    task = one(db, 'select * from task_states where task_id=?', (task_id,))
+                    out['auto_confirmed'] = True
+                    out['auto_confirmed_proposals'] = confirmed
+                    out['final_status'] = task['status']
+                    out['current_node'] = task['current_node']
             out.update(failure_count_snapshot(db, task_id))
             save_task_result(db,task_id,out['final_status'],out['current_node'],reason=out.get('technical_error','checkpoint recovery'),block_reason=out.get('block_reason'),execution_mode=mode)
+            if scene_count > 5:
+                print(f"scene {number}/{scene_count} status={out.get('final_status')}", flush=True)
     finally:
         harness.close(); db.close()
     return {'status':'completed','execution_mode':mode,'book_id':book,'database':str(path),'scenes':results,'call_count':sum(len(x['calls']) for x in results),'total_seconds':round(time.time()-start,2)}

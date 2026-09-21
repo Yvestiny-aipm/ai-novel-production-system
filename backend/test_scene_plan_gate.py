@@ -6,6 +6,7 @@ from pathlib import Path
 
 from backend.harness import PLANNING_PROMPT_VERSION, classify_scene_plan_quality
 from backend.siliconflow import ModelResponseParseError, contract_system_prompt, planning_progression_instruction
+from integration.recovery import reclassify_orphaned_planning_exception
 from integration.run_real_test import run, save_plan
 from integration.seed_real_test import seed
 
@@ -24,7 +25,7 @@ assert 'exactly 1250' in prompt or 'MUST be exactly 1250' in prompt
 assert '2000' in prompt and '1000' in prompt and '1500' in prompt
 assert 'progression_baseline' in prompt
 assert 'payload top level' in prompt
-assert PLANNING_PROMPT_VERSION == 'planning_progression_v3'
+assert PLANNING_PROMPT_VERSION == 'planning_progression_v4'
 assert '顶层独立出现' in planning_progression_instruction()
 for field in ('characters', 'location', 'time_context'):
     payload = dict(base)
@@ -133,6 +134,11 @@ with tempfile.TemporaryDirectory() as directory:
     assert '"target_word_count": 1250' in rows[1][1]
     assert [call["task_type"] for call in adapter.calls].count("planning") == 2
     assert adapter.calls[1]["input"]["checkpoint"]["plan_version"] == 2
+    assert "planning_revision_feedback" not in adapter.calls[0]["input"]
+    revision = adapter.calls[1]["input"]["planning_revision_feedback"]
+    assert revision["reason"] == "plan_target_word_count_invalid"
+    assert revision["failed_plan_version"] == 1
+    assert revision["failed_items"] == []
     db.close()
 
 
@@ -355,6 +361,9 @@ with tempfile.TemporaryDirectory() as directory:
     assert db.execute("select count(*) from harness_calls where task_id=? and status='contract_invalid'", (TASK,)).fetchone()[0] == 1
     assert [call["task_type"] for call in adapter.calls].count("planning") == 2
     assert adapter.calls[1]["input"]["checkpoint"]["plan_version"] == 2
+    revision = adapter.calls[1]["input"]["planning_revision_feedback"]
+    assert revision["reason"] == "plan_required_fields_missing"
+    assert revision["failed_plan_version"] == 1
     assert task_counts(db)[:3] == (1, 0, 0)
     db.close()
 
@@ -414,7 +423,7 @@ with tempfile.TemporaryDirectory() as directory:
     db.close()
 
 
-# 17. planning_progression_v3 must not reuse a v2 success response.
+# 17. planning_progression_v4 must not reuse a v2 success response.
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "no-v2-reuse.db"
     db, book = seed(path)
@@ -434,6 +443,45 @@ with tempfile.TemporaryDirectory() as directory:
     assert planning_calls
     assert all(call["prompt_version"] == PLANNING_PROMPT_VERSION for call in planning_calls)
     assert "hc_planted_planning_v2" not in (result["scenes"][0].get("reused_calls") or [])
+
+
+# 18. A later review JSON exception must not be reclassified from an older planning contract_invalid.
+with tempfile.TemporaryDirectory() as directory:
+    path = Path(directory) / "review-not-planning.db"
+    db, book = seed(path)
+    old_plan = {
+        "task_type": "planning", "contract_type": "ScenePlan", "contract_version": "v1",
+        "input": {"checkpoint": {"scene_id": SCENE, "plan_version": 1}},
+    }
+    db.execute(
+        "insert into harness_calls(harness_call_id,task_id,agent_type,provider,model,request_json,response_json,status,error_json,started_at,completed_at) values (?,?,?,?,?,?,?,?,?,?,?)",
+        ("hc_old_plan_invalid", TASK, "planning", "mock", "mock",
+         json.dumps(old_plan, ensure_ascii=False), json.dumps({"contract_type": "ScenePlan", "contract_version": "v1", "payload": base}, ensure_ascii=False),
+         "contract_invalid", json.dumps({"error": "CONTRACT_PAYLOAD_INVALID", "planning_reason": "plan_progression_missing"}),
+         "1", "1"))
+    db.execute(
+        "insert into harness_calls(harness_call_id,task_id,agent_type,provider,model,request_json,response_json,status,started_at,completed_at) values (?,?,?,?,?,?,?,?,?,?)",
+        ("hc_later_plan_ok", TASK, "planning", "mock", "mock",
+         json.dumps({"task_type": "planning", "input": {"checkpoint": {"scene_id": SCENE, "plan_version": 2}}}, ensure_ascii=False),
+         json.dumps({"contract_type": "ScenePlan", "contract_version": "v1", "payload": base}, ensure_ascii=False),
+         "success", "2", "2"))
+    db.execute(
+        "insert into harness_calls(harness_call_id,task_id,agent_type,provider,model,request_json,status,error_json,started_at,completed_at) values (?,?,?,?,?,?,?,?,?,?)",
+        ("hc_review_json", TASK, "review_plot", "mock", "mock",
+         json.dumps({"task_type": "review_plot", "input": {"checkpoint": {"scene_id": SCENE, "plan_version": 2}}}, ensure_ascii=False),
+         "failed", json.dumps({"error": "MODEL_RESPONSE_JSON_INVALID"}), "3", "3"))
+    db.execute(
+        "insert into exception_queue(exception_id,task_id,source_node,error_code,error_message,details_json,status,retry_count,created_at) values (?,?,?,?,?,?,?,?,?)",
+        ("ex_review_json", TASK, "reviewing", "MODEL_RESPONSE_JSON_INVALID", "bad json",
+         json.dumps({"harness_call_id": "hc_review_json"}), "pending", 0, "2026"))
+    db.execute(
+        "update task_states set status='exception_pending',current_node='exception_handling',next_action='handle_exception',exception_id=? where task_id=?",
+        ("ex_review_json", TASK))
+    db.commit()
+    assert reclassify_orphaned_planning_exception(db, TASK) is False
+    assert db.execute("select status from exception_queue where exception_id='ex_review_json'").fetchone()[0] == "pending"
+    assert db.execute("select status from task_states where task_id=?", (TASK,)).fetchone()[0] == "exception_pending"
+    db.close()
 
 
 print('scene plan gate ok')

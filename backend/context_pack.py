@@ -2,6 +2,9 @@
 import hashlib, json
 from datetime import datetime, timezone
 
+from backend.character_canon import character_canon_snapshot
+from backend.setting_canon import setting_canon_snapshot
+
 PRIORITY = {"brief": 100, "world_rule": 90, "book_memory": 80, "scene_memory": 70, "chapter": 60, "reference": 10}
 def stamp(): return datetime.now(timezone.utc).isoformat()
 def digest(value): return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -22,7 +25,7 @@ class ContextPackService:
         for key, items in seen.items():
             if len({json.dumps(i["content"],sort_keys=True,ensure_ascii=False) for i in items})>1: conflicts.append({"target_key":key,"source_ids":[i["source_id"] for i in items],"reason":"conflicting values retained separately"})
         allowed.sort(key=lambda x:(-x["score"], x["source_id"] or ""))
-        payload={"book_id":book_id,"scene_id":scene_id,"fixture_id":f"{book_id}:{scene_id}","approved_facts":allowed,"previous_scene_state":previous_scene_state or {},"chapter_summary":chapter_summary,"excluded_sources":list(excluded),"missing_sources":list(missing_sources),"conflicts":conflicts,"story_state_version":story_state_version,"canon_version":canon_version}
+        payload={"book_id":book_id,"scene_id":scene_id,"fixture_id":f"{book_id}:{scene_id}","approved_facts":allowed,"previous_scene_state":previous_scene_state or {},"chapter_summary":chapter_summary,"excluded_sources":list(excluded),"missing_sources":list(missing_sources),"conflicts":conflicts,"story_state_version":story_state_version,"canon_version":canon_version,"character_canon":character_canon_snapshot(version=canon_version),"setting_canon":setting_canon_snapshot(version=canon_version)}
         content_hash=digest(payload)
         existing=self.db.execute("SELECT payload_json,content_hash,context_pack_id FROM context_packs WHERE scene_id=? AND context_pack_version=? AND target_agent=? AND target_node=?",(scene_id,version,target_agent,target_node)).fetchone()
         if existing:

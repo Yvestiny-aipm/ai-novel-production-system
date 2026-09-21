@@ -26,7 +26,7 @@ REVIEWER_SCENE_STATE_FIELDS = (
 REVIEWER_ACHIEVED_ITEM_FIELDS = (
     "progress_type", "target_key", "before_state", "after_state", "evidence_text", "evidence_location",
 )
-PLANNING_PROMPT_VERSION = "planning_progression_v3"
+PLANNING_PROMPT_VERSION = "planning_progression_v4"
 SCENE_PLAN_REQUIRED_FIELDS = (
     "scene_goal", "entrance_state", "exit_state", "characters", "location", "time_context",
     "conflict", "action_beats", "must_happen", "must_not_happen", "knowledge_boundary",

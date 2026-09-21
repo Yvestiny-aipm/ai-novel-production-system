@@ -5,8 +5,10 @@ import tempfile
 from pathlib import Path
 
 from backend.harness import PLANNING_PROMPT_VERSION, validate_scene_plan_against_input, ContractFormatError
-from backend.progression import PLAN_BEFORE_STATE_REASON, progression_baseline_from_state
-from backend.siliconflow import contract_system_prompt, planning_progression_instruction
+from backend.progression import (PLAN_BEFORE_STATE_REASON, plan_before_state_conflict_items,
+    plan_before_state_conflict_reason, progression_baseline_from_state)
+from backend.siliconflow import (build_chat_messages, contract_system_prompt,
+    planning_progression_instruction)
 from integration.run_real_test import run, save_draft, save_plan
 from integration.seed_real_test import seed
 
@@ -137,9 +139,48 @@ expect_plan_input(scene_plan(GATES_16_ITEMS), followup, ok=False)
 
 prompt = contract_system_prompt("ScenePlan")
 assert "progression_baseline" in prompt
-assert PLANNING_PROMPT_VERSION == "planning_progression_v3"
+assert PLANNING_PROMPT_VERSION == "planning_progression_v4"
 assert "不得总结、改写" in planning_progression_instruction()
 assert "顶层独立出现" in planning_progression_instruction()
+
+copied_character = "林照神色紧绷地站在档案柜前"
+like_20i_baseline = progression_baseline_from_state({
+    **PREVIOUS, "characters": [copied_character, "林照"],
+})
+like_20i_reqs = [requirement("new_clue", "档案改动", copied_character, "确认改档")]
+assert plan_before_state_conflict_reason(like_20i_reqs, like_20i_baseline) == PLAN_BEFORE_STATE_REASON
+like_20i_items = plan_before_state_conflict_items(like_20i_reqs, like_20i_baseline)
+assert like_20i_items and like_20i_items[0]["progress_type"] == "new_clue"
+assert like_20i_items[0]["before_state"] == copied_character
+assert set(like_20i_items[0]["allowed_fields"]) == {"events", "unresolved_threads"}
+assert "characters" not in like_20i_items[0]["allowed_fields"]
+ok_reqs = [requirement("new_clue", "便条", "林照发现姐姐失踪相关便条", "确认改档")]
+assert plan_before_state_conflict_reason(ok_reqs, baseline) is None
+assert plan_before_state_conflict_items(ok_reqs, baseline) == []
+
+no_fb_messages = build_chat_messages({"contract_type": "ScenePlan", "input": followup})
+assert len(no_fb_messages) == 3
+assert no_fb_messages[2]["content"] == planning_progression_instruction()
+assert "你自称" not in "".join(item["content"] for item in no_fb_messages)
+assert "1287" not in "".join(item["content"] for item in no_fb_messages)
+fb_input = {
+    **followup,
+    "planning_revision_feedback": {
+        "reason": PLAN_BEFORE_STATE_REASON,
+        "failed_plan_version": 1,
+        "failed_items": like_20i_items,
+    },
+}
+fb_messages = build_chat_messages({"contract_type": "ScenePlan", "input": fb_input})
+assert len(fb_messages) == 4
+assert fb_messages[2]["content"] == planning_progression_instruction()
+assert fb_messages[3]["role"] == "user"
+assert PLAN_BEFORE_STATE_REASON in fb_messages[3]["content"]
+assert copied_character in fb_messages[3]["content"]
+assert "不得从其他列挪句子" in fb_messages[3]["content"]
+assert "禁止交回同一套错误 before_state" in fb_messages[3]["content"]
+assert "你自称" not in fb_messages[3]["content"]
+assert "1287" not in fb_messages[3]["content"]
 
 
 def confirm_scene1(db, book, accepted=None):
@@ -187,6 +228,7 @@ with tempfile.TemporaryDirectory() as directory:
     result = run(db_path=path, adapter=adapter, execution_mode="sequential")
     planning = next(call for call in adapter.calls if call["task_type"] == "planning")
     assert planning["input"]["scene_number"] == 1
+    assert "planning_revision_feedback" not in planning["input"]
     assert "progression_baseline" not in planning["input"]
     assert planning["input"]["context_pack"]["previous_scene_state"] == {}
     assert result["scenes"][0]["final_status"] == "waiting_confirmation"
@@ -214,6 +256,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert versions == [1]
     planning = adapter.calls[0]
     assert planning["prompt_version"] == PLANNING_PROMPT_VERSION
+    assert "planning_revision_feedback" not in planning["input"]
     assert set(planning["input"]["progression_baseline"]) == set(PREVIOUS)
     db.close()
     second = run(db_path=path, adapter=adapter, execution_mode="sequential")
@@ -223,6 +266,15 @@ with tempfile.TemporaryDirectory() as directory:
     assert adapter.calls[1]["task_type"] == "planning"
     assert adapter.calls[1]["input"]["checkpoint"]["plan_version"] == 2
     assert adapter.calls[1]["input"]["progression_baseline"]["unresolved_threads"] == PREVIOUS["unresolved_threads"]
+    revision = adapter.calls[1]["input"]["planning_revision_feedback"]
+    assert revision["reason"] == PLAN_BEFORE_STATE_REASON
+    assert revision["failed_plan_version"] == 1
+    assert revision["failed_items"]
+    assert {item["progress_type"] for item in revision["failed_items"]} == {
+        item["progress_type"] for item in GATES_16_ITEMS
+    }
+    assert "previous_scene_state" not in revision
+    assert "progression_requirements" not in revision
     db.close()
 
 
@@ -257,6 +309,8 @@ with tempfile.TemporaryDirectory() as directory:
         requirement("thread_advanced", "林澜失踪", "林澜失踪尚未定位", "指向北礁"),
     ]])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential")
+    planning = next(call for call in adapter.calls if call["task_type"] == "planning")
+    assert "planning_revision_feedback" not in planning["input"]
     assert any(call["task_type"] == "writing" for call in adapter.calls)
     assert result["scenes"][1].get("progression_failure_reason") != PLAN_BEFORE_STATE_REASON
 

@@ -9,7 +9,8 @@ from backend.prose_length import (DEFAULT_TARGET_WORD_COUNT, MAX_CHARACTER_COUNT
     MIN_CHARACTER_COUNT, PREFERRED_SOFT_MAX, PREFERRED_SOFT_MIN, WRITING_PROMPT_VERSION,
     actual_character_count, length_revision_feedback, planning_length_rework_feedback,
     validate_prose_length)
-from backend.siliconflow import build_chat_messages, first_draft_writing_instruction, writing_length_edit_instruction
+from backend.siliconflow import (build_chat_messages, first_draft_writing_instruction,
+    writing_length_edit_instruction, writing_quality_edit_instruction)
 from integration.run_real_test import run, save_draft
 from integration.seed_real_test import seed
 
@@ -26,7 +27,8 @@ assert actual_character_count(" 潮\n痕\t") == 2
 for size, status, reason in ((0, "failed", "empty_text"), (346, "failed", "under_length"),
                              (999, "failed", "under_length"), (1000, "passed", None),
                              (1250, "passed", None), (1500, "passed", None),
-                             (1501, "failed", "over_length")):
+                             (1501, "passed", None), (2300, "passed", None),
+                             (2301, "failed", "over_length")):
     result = validate_prose_length("潮" * size)
     assert (result["actual_character_count"], result["length_validation_status"], result["length_validation_reason"]) == (size, status, reason)
 
@@ -43,30 +45,31 @@ expand = length_revision_feedback(failed_draft("s_draft_v1", 682, "under_length"
 assert expand["adjustment_direction"] == "expand"
 assert expand["character_delta_to_target"] == 1250 - 682
 assert expand["required_minimum_character_delta"] == 1000 - 682
-assert expand["required_maximum_character_delta"] == 1500 - 682
+assert expand["required_maximum_character_delta"] == MAX_CHARACTER_COUNT - 682
 assert expand["preferred_character_delta"] == 1250 - 682
 assert expand["preferred_output_minimum"] == PREFERRED_SOFT_MIN
 assert expand["preferred_output_maximum"] == PREFERRED_SOFT_MAX
 assert expand["previous_text"] == "潮" * 682
-trim = length_revision_feedback(failed_draft("s_draft_v2", 1517, "over_length", 2))
-assert trim["adjustment_direction"] == "trim" and trim["character_delta_to_target"] == 1250 - 1517
-assert trim["required_minimum_character_delta"] == 1517 - 1500
-assert trim["preferred_character_delta"] == 1517 - 1250
+assert "previous_model_reported_word_count" not in expand
+trim = length_revision_feedback(failed_draft("s_draft_v2", 2317, "over_length", 2))
+assert trim["adjustment_direction"] == "trim" and trim["character_delta_to_target"] == 1250 - 2317
+assert trim["required_minimum_character_delta"] == 2317 - MAX_CHARACTER_COUNT
+assert trim["preferred_character_delta"] == 2317 - 1250
 assert length_revision_feedback({"length_validation_status": "passed", "length_validation_reason": None}) is None
 
-# 5/6. gates_7 quantitative deltas: 683 expand, 1598 trim.
+# 5/6. gates_7 quantitative deltas: 683 expand, 2398 trim.
 gates7_expand = length_revision_feedback(failed_draft("g7_v1", 683, "under_length"))
 assert gates7_expand["required_minimum_character_delta"] == 317
-assert gates7_expand["required_maximum_character_delta"] == 817
+assert gates7_expand["required_maximum_character_delta"] == MAX_CHARACTER_COUNT - 683
 assert gates7_expand["preferred_character_delta"] == 567
 assert gates7_expand["character_delta_to_target"] == 567
 assert gates7_expand["approximate_output_ratio"] == 1.83
-gates7_trim = length_revision_feedback(failed_draft("g7_v2", 1598, "over_length", 2))
-assert gates7_trim["required_minimum_character_delta"] == 98
-assert gates7_trim["required_maximum_character_delta"] == 598
-assert gates7_trim["preferred_character_delta"] == 348
-assert gates7_trim["character_delta_to_target"] == -348
-assert gates7_trim["approximate_output_ratio"] == 0.78
+gates7_trim = length_revision_feedback(failed_draft("g7_v2", 2398, "over_length", 2))
+assert gates7_trim["required_minimum_character_delta"] == 2398 - MAX_CHARACTER_COUNT
+assert gates7_trim["required_maximum_character_delta"] == 2398 - MIN_CHARACTER_COUNT
+assert gates7_trim["preferred_character_delta"] == 2398 - 1250
+assert gates7_trim["character_delta_to_target"] == 1250 - 2398
+assert gates7_trim["approximate_output_ratio"] == round(1250 / 2398, 2)
 assert gates7_expand["preferred_output_minimum"] == 1200
 assert gates7_trim["preferred_output_maximum"] == 1350
 
@@ -79,8 +82,14 @@ assert [item["role"] for item in first_messages] == ["system", "user", "user"]
 assert "contract_type" in first_messages[0]["content"] and "ProseDraft" in first_messages[0]["content"]
 assert "revision_feedback" not in first_messages[1]["content"]
 assert first_messages[2]["content"] == first_draft_writing_instruction()
-assert "1000～1500" in first_messages[2]["content"] and "1200～1350" in first_messages[2]["content"]
+assert "1000～2300" in first_messages[2]["content"] and "1200～1350" in first_messages[2]["content"]
 assert "不能只改word_count" in first_messages[2]["content"]
+assert "超过2300不合格" in first_messages[2]["content"]
+assert "必须压到硬上限以下" in first_messages[2]["content"]
+assert "不是官方计数" in first_messages[2]["content"]
+assert "must_not_happen" in first_messages[2]["content"]
+assert "knowledge_boundary" in first_messages[2]["content"]
+assert "已批准世界规则" in first_messages[2]["content"]
 
 under_request = {"contract_type": "ProseDraft", "input": {
     "context_pack": {"pack_id": "p1"}, "scene_plan": {"payload": {"scene_goal": "推进"}},
@@ -101,17 +110,64 @@ assert over_messages[2]["content"] == writing_length_edit_instruction(gates7_tri
 assert under_messages[2]["content"] != over_messages[2]["content"]
 assert gates7_expand["previous_text"] not in under_messages[2]["content"]
 assert "至少增加317" in under_messages[2]["content"] and "建议增加567" in under_messages[2]["content"]
-assert "增加实际行动" in under_messages[2]["content"]
-assert "至少删除98" in over_messages[2]["content"] and "建议删除348" in over_messages[2]["content"]
+assert "写得更具体" in under_messages[2]["content"]
+assert "禁止交回同一篇" in under_messages[2]["content"]
+assert "必须加到硬下限以上" in under_messages[2]["content"]
+assert "会被立即阻断" in under_messages[2]["content"]
+assert "不得新增未铺垫人物、地点、世界机制" in under_messages[2]["content"]
+assert "不得让灯塔具备保存与展示记忆以外的能力" in under_messages[2]["content"]
+assert "至少删除98" in over_messages[2]["content"] and "建议删除1148" in over_messages[2]["content"]
 assert "真正删除" in over_messages[2]["content"]
+assert "禁止交回同一篇" in over_messages[2]["content"]
+assert "必须删到硬上限以下" in over_messages[2]["content"]
+assert "会被立即阻断" in over_messages[2]["content"]
 assert "不能只改word_count" in over_messages[2]["content"]
+assert "不得新增未铺垫人物" not in over_messages[2]["content"]
+assert "写得更具体" not in over_messages[2]["content"]
+assert "整篇不动" not in over_messages[2]["content"]
 for instruction in (under_messages[2]["content"], over_messages[2]["content"]):
-    assert "1000～1500" in instruction and "1200～1350" in instruction
-assert WRITING_PROMPT_VERSION == "prose_quality_v5"
+    assert "1000～2300" in instruction and "1200～1350" in instruction
+    assert "后端实算" in instruction
+    assert "不是官方计数" in instruction
+    assert "1287" not in instruction
+assert WRITING_PROMPT_VERSION == "prose_quality_v8"
+reported_trim = length_revision_feedback({
+    **failed_draft("h_draft_v2", 1622, "over_length", 2),
+    "model_reported_word_count": 1287,
+})
+assert reported_trim["previous_model_reported_word_count"] == 1287
+assert reported_trim["previous_actual_character_count"] == 1622
+reported_trim_text = writing_length_edit_instruction(reported_trim)
+assert "1287" in reported_trim_text and "1622" in reported_trim_text
+assert "以1622为准" in reported_trim_text
+assert "后端实算" in reported_trim_text
+assert "必须删到硬上限以下" in reported_trim_text
+assert "会被立即阻断" in reported_trim_text
+assert "不得新增未铺垫人物" not in reported_trim_text
+quality_only = {
+    "failure_type": "quality_report",
+    "reviewer_findings": [{
+        "reviewer_role": "world_consistency", "result": "failed", "issue_count": 1,
+        "findings": ["世界规则冲突"],
+    }],
+}
+both_messages = build_chat_messages({"contract_type": "ProseDraft", "input": {
+    "scene_plan": {"payload": {"scene_goal": "推进"}},
+    "revision_feedback": gates7_expand,
+    "quality_revision_feedback": quality_only,
+}})
+assert both_messages[2]["content"] == writing_length_edit_instruction(gates7_expand)
+assert both_messages[3]["content"] == writing_quality_edit_instruction(quality_only)
+assert "不得新增未铺垫人物" in both_messages[2]["content"]
+assert "世界规则冲突" in both_messages[3]["content"]
+assert "必须改写或删除" in both_messages[3]["content"]
+assert "保留已通过内容" not in both_messages[3]["content"]
+assert "禁止原样返回" in both_messages[3]["content"]
+assert "禁止只改结构化字段或word_count" in both_messages[3]["content"]
 assert planning_length_rework_feedback([
     {"length_validation_reason": "under_length", "actual_character_count": 682},
     {"length_validation_reason": "under_length", "actual_character_count": 624},
-    {"length_validation_reason": "over_length", "actual_character_count": 1517},
+    {"length_validation_reason": "over_length", "actual_character_count": 2317},
 ])["reason"] == "consecutive_length_failures"
 
 
@@ -162,7 +218,7 @@ class LengthSequenceAdapter:
     """Four length drafts stay on the same plan; Planning is not involved."""
     def __init__(self):
         self.calls = []
-        self.writing_sizes = [346, 999, 1501, 1000]
+        self.writing_sizes = [346, 999, 2301, 1000]
 
     def complete(self, request, timeout_seconds):
         self.calls.append(request)
@@ -191,7 +247,7 @@ with tempfile.TemporaryDirectory() as directory:
     # First three failed lengths stay on Plan v1. The fourth draft (1000)
     # enters review; Planning is never asked to fix model length.
     rows = db.execute("select draft_version,plan_version,content_attempt_in_plan,content_attempt_total,word_count,length_validation_status,length_validation_reason from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall()
-    assert rows == [(1, 1, 1, 1, 346, "failed", "under_length"), (2, 1, 2, 2, 999, "failed", "under_length"), (3, 1, 3, 3, 1501, "failed", "over_length"), (4, 1, 4, 4, 1000, "passed", None)]
+    assert rows == [(1, 1, 1, 1, 346, "failed", "under_length"), (2, 1, 2, 2, 999, "failed", "under_length"), (3, 1, 3, 3, 2301, "failed", "over_length"), (4, 1, 4, 4, 1000, "passed", None)]
     assert db.execute("select plan_attempt,content_attempt_in_plan,content_attempt_total from task_states where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone() == (1, 0, 0)
     assert db.execute("select count(*) from quality_reports where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone()[0] == 1
     assert db.execute("select draft_id from quality_reports where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone()[0].endswith("draft_v4")
@@ -213,7 +269,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert len(planning_calls) == 1
     assert "planning_rework_feedback" not in planning_calls[0]["input"]
     assert writing_calls[3]["input"]["revision_feedback"]["adjustment_direction"] == "trim"
-    assert writing_calls[3]["input"]["revision_feedback"]["previous_actual_character_count"] == 1501
+    assert writing_calls[3]["input"]["revision_feedback"]["previous_actual_character_count"] == 2301
     assert {call["prompt_version"] for call in writing_calls} == {WRITING_PROMPT_VERSION}
     assert {call["prompt_version"] for call in planning_calls} == {PLANNING_PROMPT_VERSION}
     db.close()
@@ -246,7 +302,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert feedback["adjustment_direction"] == "expand"
     assert feedback["character_delta_to_target"] == 1250 - 682
     assert feedback["required_minimum_character_delta"] == 318
-    assert feedback["required_maximum_character_delta"] == 818
+    assert feedback["required_maximum_character_delta"] == MAX_CHARACTER_COUNT - 682
     assert feedback["preferred_character_delta"] == 568
     assert feedback["approximate_output_ratio"] == round(1250 / 682, 2)
     assert calls[1]["input"]["checkpoint"] != calls[0]["input"]["checkpoint"]
@@ -255,23 +311,23 @@ with tempfile.TemporaryDirectory() as directory:
     db.close()
 
 
-# 3/4/6. A 1517-character miss produces trim feedback; reviewers only see the passing draft.
+# 3/4/6. A 2317-character miss produces trim feedback; reviewers only see the passing draft.
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "trim-feedback.db"
-    adapter = FeedbackSequenceAdapter([1517, 1000])
+    adapter = FeedbackSequenceAdapter([2317, 1000])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential")
     db = sqlite3.connect(path)
     calls = writing_calls(adapter)
     feedback = calls[1]["input"]["revision_feedback"]
     first_id = "realtest_tide_archive_scene_1_draft_v1"
     assert feedback["adjustment_direction"] == "trim"
-    assert feedback["character_delta_to_target"] == 1250 - 1517
+    assert feedback["character_delta_to_target"] == 1250 - 2317
     assert feedback["previous_draft_id"] == first_id
-    assert feedback["previous_text"] == "潮" * 1517
-    assert db.execute("select text,actual_character_count from prose_drafts where draft_id=?", (first_id,)).fetchone() == ("潮" * 1517, 1517)
+    assert feedback["previous_text"] == "潮" * 2317
+    assert db.execute("select text,actual_character_count from prose_drafts where draft_id=?", (first_id,)).fetchone() == ("潮" * 2317, 2317)
     review_calls = [call for call in adapter.calls if call["task_type"].startswith("review_")]
     assert {call["input"]["draft"]["payload"]["word_count"] for call in review_calls} == {1000}
-    assert all("潮" * 1517 not in json.dumps(call["input"]["draft"], ensure_ascii=False) for call in review_calls)
+    assert all("潮" * 2317 not in json.dumps(call["input"]["draft"], ensure_ascii=False) for call in review_calls)
     db.close()
 
 
@@ -279,7 +335,7 @@ with tempfile.TemporaryDirectory() as directory:
 class BlockAfterFourAdapter(LengthSequenceAdapter):
     def __init__(self):
         super().__init__()
-        self.writing_sizes = [682, 624, 384, 1517]
+        self.writing_sizes = [682, 624, 384, 2317]
 
 
 with tempfile.TemporaryDirectory() as directory:
@@ -291,7 +347,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert result["scenes"][0]["current_node"] == "writing"
     assert result["scenes"][0]["block_reason"] == "length_attempts_exhausted"
     rows = db.execute("select draft_version,plan_version,actual_character_count,length_validation_reason from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall()
-    assert rows == [(1, 1, 682, "under_length"), (2, 1, 624, "under_length"), (3, 1, 384, "under_length"), (4, 1, 1517, "over_length")]
+    assert rows == [(1, 1, 682, "under_length"), (2, 1, 624, "under_length"), (3, 1, 384, "under_length"), (4, 1, 2317, "over_length")]
     assert db.execute("select plan_attempt,content_attempt_in_plan,content_attempt_total,status from task_states where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone() == (1, 0, 0, "blocked")
     assert db.execute("select coalesce(max(plan_version),0) from scene_plans where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone()[0] == 1
     writing = writing_calls(adapter)
@@ -309,7 +365,7 @@ with tempfile.TemporaryDirectory() as directory:
     db.close()
 
 
-# 21 / 22. gates_17 scene 4: 1618→982→1538 may still write a 4th length draft; 1611 then blocks.
+# 21 / 22. gates_17 scene 4: 2418→982→2338 may still write a 4th length draft; 2411 then blocks.
 class Gates17LengthAdapter(LengthSequenceAdapter):
     def __init__(self, sizes):
         super().__init__()
@@ -318,14 +374,14 @@ class Gates17LengthAdapter(LengthSequenceAdapter):
 
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "gates17-fourth-allowed.db"
-    adapter = Gates17LengthAdapter([1618, 982, 1538, 1250])
+    adapter = Gates17LengthAdapter([2418, 982, 2338, 1250])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential")
     db = sqlite3.connect(path)
     assert [call["task_type"] for call in adapter.calls].count("planning") == 1
     assert [call["task_type"] for call in adapter.calls].count("writing") == 4
     assert result["scenes"][0]["final_status"] == "waiting_confirmation"
     assert db.execute("select draft_version,plan_version,actual_character_count,length_validation_reason from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall() == [
-        (1, 1, 1618, "over_length"), (2, 1, 982, "under_length"), (3, 1, 1538, "over_length"), (4, 1, 1250, None),
+        (1, 1, 2418, "over_length"), (2, 1, 982, "under_length"), (3, 1, 2338, "over_length"), (4, 1, 1250, None),
     ]
     assert db.execute("select plan_attempt,content_attempt_in_plan,content_attempt_total,status from task_states where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone() == (1, 0, 0, "waiting_confirmation")
     db.close()
@@ -333,13 +389,13 @@ with tempfile.TemporaryDirectory() as directory:
 
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "gates17-fourth-blocks.db"
-    adapter = Gates17LengthAdapter([1618, 982, 1538, 1611])
+    adapter = Gates17LengthAdapter([2418, 982, 2338, 2411])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential")
     db = sqlite3.connect(path)
     assert [call["task_type"] for call in adapter.calls].count("planning") == 1
     assert result["scenes"][0]["final_status"] == "blocked"
     assert result["scenes"][0]["block_reason"] == "length_attempts_exhausted"
-    assert db.execute("select actual_character_count from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall() == [(1618,), (982,), (1538,), (1611,)]
+    assert db.execute("select actual_character_count from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall() == [(2418,), (982,), (2338,), (2411,)]
     assert db.execute("select coalesce(max(plan_version),0) from scene_plans where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone()[0] == 1
     db.close()
 
@@ -405,5 +461,27 @@ with tempfile.TemporaryDirectory() as directory:
     assert draft_text == "潮" * 1000
     assert planted_text not in draft_text
     db.close()
+
+# Same-scene identical short drafts are duplicate_draft_content, not more length failures.
+with tempfile.TemporaryDirectory() as directory:
+    path = Path(directory) / "same-short-hash.db"
+    adapter = FeedbackSequenceAdapter([710, 710, 710])
+    result = run(db_path=path, adapter=adapter, execution_mode="sequential")
+    db = sqlite3.connect(path)
+    writing = writing_calls(adapter)
+    assert len(writing) == 2
+    assert result["scenes"][0]["final_status"] == "blocked"
+    assert result["scenes"][0]["block_reason"] == "duplicate_draft_content"
+    length_events = [row[0] for row in db.execute(
+        "select event_type from task_events where task_id=? and event_type in "
+        "('length_rework_requested','length_failure_blocked') order by created_at",
+        ("realtest_tide_archive_scene_1_task",))]
+    assert length_events == ["length_rework_requested"]
+    hashes = [row[0] for row in db.execute(
+        "select draft_hash from prose_drafts where scene_id=? order by draft_version",
+        ("realtest_tide_archive_scene_1",))]
+    assert len(hashes) == 2 and hashes[0] == hashes[1]
+    db.close()
+
 
 print("prose length gate ok")

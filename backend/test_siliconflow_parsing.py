@@ -4,9 +4,10 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
-from siliconflow import (ModelResponseParseError, PARSE_EXCERPT_LIMIT, PARSE_SUFFIX_LIMIT,
-    PLAIN_PROSE_WRAP_RULE, TRIM_SINGLE_REDUNDANT_BRACE_RULE, parse_contract_content)
-from harness import ContractFormatError, Harness, ModelProfile, required_fields_validator
+from backend.siliconflow import (ESCAPE_UNESCAPED_QUOTES_IN_REVIEWER_STRINGS_RULE,
+    ModelResponseParseError, PARSE_EXCERPT_LIMIT, PARSE_SUFFIX_LIMIT, PLAIN_PROSE_WRAP_RULE,
+    TRIM_SINGLE_REDUNDANT_BRACE_RULE, parse_contract_content)
+from backend.harness import ContractFormatError, Harness, ModelProfile, required_fields_validator
 
 valid='{"contract_type":"ScenePlan","contract_version":"v1","payload":{"scene_goal":"x"}}'
 clean = parse_contract_content('说明文字\n```json\n'+valid+'\n```\n结束')
@@ -213,6 +214,71 @@ except ModelResponseParseError as error:
     assert error.error_code == "MODEL_OUTPUT_TRUNCATED"
 else:
     raise AssertionError("truncated prose was wrapped as a complete draft")
+
+
+# ReviewerResult may escape bare ASCII quotes inside string values only.
+BARE_QUOTE = '结尾"我会再来"略显直白'
+reviewer_ok = {
+    "contract_type": "ReviewerResult", "contract_version": "v1",
+    "payload": {
+        "reviewer_role": "character_plot", "result": "passed", "findings": [],
+        "suggestions": [BARE_QUOTE], "issue_count": 0, "severity": "ordinary",
+        "impact_scope": "local", "true_conflict_candidate": False,
+        "scene_state": {
+            "characters": ["林照"], "location": "灯塔", "time_context": "夜晚",
+            "events": [], "relationship_changes": [], "unresolved_threads": [],
+        },
+    },
+}
+legal_reviewer = json.dumps(reviewer_ok, ensure_ascii=False)
+legal_parsed = parse_contract_content(legal_reviewer, expected="ReviewerResult")
+assert legal_parsed["payload"]["suggestions"] == [BARE_QUOTE]
+assert "contract_parse_normalization_audit" not in legal_parsed
+
+broken_reviewer = legal_reviewer.replace('\\"', '"')
+assert '"我会再来"' in broken_reviewer
+repaired_reviewer = parse_contract_content(broken_reviewer, expected="ReviewerResult")
+assert repaired_reviewer["payload"]["suggestions"] == [BARE_QUOTE]
+assert repaired_reviewer["payload"]["result"] == "passed"
+assert repaired_reviewer["contract_parse_normalization_audit"]["rule"] == ESCAPE_UNESCAPED_QUOTES_IN_REVIEWER_STRINGS_RULE
+
+try:
+    parse_contract_content(broken_reviewer, expected="ScenePlan")
+except ModelResponseParseError as error:
+    assert error.error_code == "MODEL_RESPONSE_JSON_INVALID"
+else:
+    raise AssertionError("bare quotes were repaired for ScenePlan")
+try:
+    parse_contract_content(broken_reviewer, expected="ProseDraft")
+except ModelResponseParseError as error:
+    assert error.error_code == "MODEL_RESPONSE_JSON_INVALID"
+else:
+    raise AssertionError("bare quotes were repaired for ProseDraft")
+
+unclosed_reviewer = '{"contract_type":"ReviewerResult","payload":{"suggestions":["结尾'
+try:
+    parse_contract_content(unclosed_reviewer, expected="ReviewerResult")
+except ModelResponseParseError as error:
+    assert error.error_code == "MODEL_RESPONSE_JSON_INVALID"
+    assert "Unterminated" in str(error.parse_error) or "Unterminated" in str(error)
+else:
+    raise AssertionError("unclosed ReviewerResult string was repaired")
+
+two_reviewers = legal_reviewer + legal_reviewer
+try:
+    parse_contract_content(two_reviewers, expected="ReviewerResult")
+except ModelResponseParseError as error:
+    assert error.error_code == "MODEL_RESPONSE_JSON_INVALID"
+    assert "Extra data" in str(error.parse_error) or "Extra data" in str(error)
+else:
+    raise AssertionError("two ReviewerResult objects were accepted")
+
+try:
+    parse_contract_content(broken_reviewer, finish_reason="length", expected="ReviewerResult")
+except ModelResponseParseError as error:
+    assert error.error_code == "MODEL_OUTPUT_TRUNCATED"
+else:
+    raise AssertionError("truncated ReviewerResult quotes were repaired")
 
 
 print('siliconflow response parsing ok')

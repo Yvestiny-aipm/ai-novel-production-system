@@ -1,7 +1,8 @@
 from backend.azure_foundry import DEFAULT_FOUNDRY_DEPLOYMENT
+from backend.deepseek import DEFAULT_DEEPSEEK_MODEL
 from backend.model_routing import (
-    DEFAULT_MAX_OUTPUT_TOKENS, FOUNDRY_MAX_OUTPUT_TOKENS, PROVIDER_FOUNDRY,
-    PROVIDER_SILICONFLOW, build_harness_setup, create_adapter,
+    DEFAULT_MAX_OUTPUT_TOKENS, FOUNDRY_MAX_OUTPUT_TOKENS, PROVIDER_DEEPSEEK,
+    PROVIDER_FOUNDRY, PROVIDER_SILICONFLOW, build_harness_setup, create_adapter,
     missing_runtime_credentials, resolve_max_output_tokens, resolve_routed_model,
     resolve_task_provider,
 )
@@ -96,6 +97,7 @@ assert routes["planning"].model == DEFAULT_FOUNDRY_DEPLOYMENT
 assert routes["planning"].max_output_tokens == FOUNDRY_MAX_OUTPUT_TOKENS
 assert routes["writing"].max_output_tokens == DEFAULT_MAX_OUTPUT_TOKENS
 assert routes["review_plot"].provider == PROVIDER_FOUNDRY
+assert {profile.technical_retries for profile in routes.values()} == {1}
 assert resolve_max_output_tokens(PROVIDER_FOUNDRY, {"AZURE_FOUNDRY_MAX_OUTPUT_TOKENS": "8000"}) == 8000
 
 mock_routes, mock_adapters = build_harness_setup(
@@ -105,6 +107,7 @@ assert list(mock_adapters) == ["mock"]
 assert mock_adapters["mock"] is dummy
 assert {profile.provider for profile in mock_routes.values()} == {"mock"}
 assert mock_routes["planning"].model == "mock"
+assert {profile.technical_retries for profile in mock_routes.values()} == {0}
 
 
 # 7. create_adapter rejects unknown providers and does not invent SiliconFlow by default.
@@ -114,5 +117,32 @@ except ValueError as error:
     assert str(error) == "UNKNOWN_PROVIDER:unknown"
 else:
     raise AssertionError("unknown provider was accepted")
+
+
+# 8. Official DeepSeek writing + Foundry structured; SiliconFlow key is not required.
+official = {
+    "WRITING_PROVIDER": "deepseek",
+    "STRUCTURED_PROVIDER": "azure_foundry",
+}
+assert resolve_task_provider("writing", official) == PROVIDER_DEEPSEEK
+assert resolve_routed_model("writing", official) == DEFAULT_DEEPSEEK_MODEL
+assert resolve_task_provider("planning", official) == PROVIDER_FOUNDRY
+assert "DEEPSEEK_API_KEY" in missing_runtime_credentials(official, task_types=TYPES)
+assert "SILICONFLOW_API_KEY" not in missing_runtime_credentials(official, task_types=TYPES)
+assert missing_runtime_credentials(
+    {
+        **official,
+        "DEEPSEEK_API_KEY": "sk-placeholder-not-used",
+        "AZURE_FOUNDRY_CLAUDE_ENDPOINT": "https://example-resource.services.ai.azure.com/anthropic",
+        "AZURE_FOUNDRY_AUTH": "entra",
+    },
+    task_types=TYPES,
+) == []
+official_routes, official_adapters = build_harness_setup(TYPES, official)
+assert official_routes["writing"].provider == PROVIDER_DEEPSEEK
+assert official_routes["writing"].model == "deepseek-flash"
+assert official_routes["planning"].provider == PROVIDER_FOUNDRY
+assert PROVIDER_DEEPSEEK in official_adapters
+assert PROVIDER_SILICONFLOW not in official_adapters
 
 print("ok")

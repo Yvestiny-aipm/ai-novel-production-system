@@ -40,35 +40,45 @@ Agent 只能读取当前任务的 ContextPack，并通过 Harness 发出独立�
 
 ## 安装与本地运行
 
-需要 Python 3.11+ 和 SQLite。无需把密钥写入代码、文档或 Git。
+需要 Python 3.11+。无需把密钥写入代码、文档或 Git。一键启动会创建 `.venv`、安装依赖、初始化本地库，并在同一端口提供前端和 API：
 
 ```sh
 cd "/Users/czy/AI长文系统/新系统开发"
+cp -n .env.example .env
+./scripts/dev_up.sh
+```
+
+浏览器打开 `http://127.0.0.1:8124/`（工作台）或 `http://127.0.0.1:8124/admin.html`（管理后台）。健康检查：`http://127.0.0.1:8124/healthz`。
+
+```sh
+./scripts/dev_check.sh
+./scripts/dev_down.sh
+```
+
+密钥和公司 Foundry 地址只放在本机 `.env` 或当前终端环境变量中；`.env` 已被 Git 忽略。手动安装和单独初始化数据库仍然可用：
+
+```sh
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+./db/init.sh ./data/novel.db
 python -m py_compile backend/*.py integration/*.py
 PYTHONPATH=. python acceptance/run_cases.py
-```
-
-数据库初始化示例：
-
-```sh
-./db/init.sh ./data/novel.db
 ```
 
 `data/` 下的运行数据库、真实模型样本、备份和恢复副本均被 Git 忽略。
 
 ## 环境变量与真实模型测试
 
-密钥只从环境变量读取。默认仍走硅基流动；要把规划/审查切到 Azure Foundry 的 Opus 5 时，再加上 Foundry 变量。以下值是占位符：
+密钥只从环境变量读取。未设置 `WRITING_PROVIDER` 时默认仍走硅基流动。二十场脚本默认生文走 DeepSeek 官网 `deepseek-flash`，规划/审查仍可切到 Azure Foundry。以下值是占位符：
 
 ```sh
 export RUN_REAL_MODEL=1
-export SILICONFLOW_API_KEY="<your-siliconflow-api-key>"
+export WRITING_PROVIDER=deepseek
+export DEEPSEEK_API_KEY="<your-deepseek-api-key>"
 export EXECUTION_MODE=sequential
 export REAL_TEST_DB="$PWD/data/real_test.db"
-# 可选：结构化任务改走 Claude Opus 5，写作仍走 DeepSeek
+# 可选：结构化任务改走 Claude Opus 5
 export STRUCTURED_PROVIDER=azure_foundry
 export AZURE_FOUNDRY_CLAUDE_ENDPOINT="https://<your-foundry-resource>.services.ai.azure.com/anthropic"
 export AZURE_FOUNDRY_CLAUDE_DEPLOYMENT="<your-foundry-deployment>"
@@ -77,7 +87,13 @@ export AZURE_FOUNDRY_CLAUDE_API_KEY="<your-foundry-api-key>"
 python3 integration/run_real_test.py
 ```
 
-真实运行会保留调用记录和失败现场；不要将 `data/` 中的数据库、备份或 API Key 提交到 Git。未设置 `RUN_REAL_MODEL=1` 或当前路由所需密钥时，runner 只返回 `not_run`。
+规模测试用新库，不改已经跑过的五场库。20 场对应 10 章、每章两场。脚本默认库是 `data/real_test_20_b.db`；旧库 `data/real_test_20.db` 只读留档。
+
+```sh
+./scripts/run_real_20.sh
+```
+
+`REAL_TEST_AUTO_CONFIRM=1` 只表示测试操作员代为确认记忆提案，不是 Agent 自行写入正式设定。真实运行会保留调用记录和失败现场；不要将 `data/` 中的数据库、备份或 API Key 提交到 Git。未设置 `RUN_REAL_MODEL=1` 或当前路由所需密钥时，runner 只返回 `not_run`。
 
 ## Mock 与回归测试
 
@@ -116,7 +132,7 @@ PYTHONPATH=. python3 integration/manage_backup.py restore \
 - 尚未完成 20～40 场连续规模测试。
 - 尚未完成 160 场完整小说生产与质量验收，不能声称已稳定产出 20 万字。
 - 每日备份调度、保留清理、失败告警和生产管理后台仍需在部署环境配置。
-- 下一阶段是 20～40 场规模测试，随后开展 160 场完整作品验证与生产环境运维配置。
+- 本地一键启动已配置；下一阶段是 20～40 场规模测试，随后开展 160 场完整作品验证与生产环境运维配置。
 
 ## 方案文档
 

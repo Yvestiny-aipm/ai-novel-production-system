@@ -142,27 +142,46 @@ def _existing_open_thread(item, baseline):
     return False
 
 
+def _plan_before_state_item_conflict(item, baseline):
+    if not isinstance(item, dict):
+        return False
+    progress_type = item.get("progress_type")
+    before = item.get("before_state")
+    if progress_type == "thread_opened":
+        return _existing_open_thread(item, baseline) or not _unknown(before)
+    if progress_type in ALLOW_UNKNOWN_BEFORE and _unknown(before):
+        return False
+    fields = PLAN_BEFORE_STATE_FIELDS.get(progress_type)
+    if not fields:
+        return False
+    return _unknown(before) or not contains_state(_baseline_fields(baseline, fields), before)
+
+
 def plan_before_state_conflict_reason(requirements, baseline):
     """Return the planning-quality reason when a before_state is not a literal previous-state copy."""
     if not isinstance(requirements, list):
         return None
     for item in requirements:
-        if not isinstance(item, dict):
-            continue
-        progress_type = item.get("progress_type")
-        before = item.get("before_state")
-        if progress_type == "thread_opened":
-            if _existing_open_thread(item, baseline) or not _unknown(before):
-                return PLAN_BEFORE_STATE_REASON
-            continue
-        if progress_type in ALLOW_UNKNOWN_BEFORE and _unknown(before):
-            continue
-        fields = PLAN_BEFORE_STATE_FIELDS.get(progress_type)
-        if not fields:
-            continue
-        if _unknown(before) or not contains_state(_baseline_fields(baseline, fields), before):
+        if _plan_before_state_item_conflict(item, baseline):
             return PLAN_BEFORE_STATE_REASON
     return None
+
+
+def plan_before_state_conflict_items(requirements, baseline):
+    """List each failed progression_requirements item. Same gate as the reason string."""
+    if not isinstance(requirements, list):
+        return []
+    items = []
+    for item in requirements:
+        if not _plan_before_state_item_conflict(item, baseline):
+            continue
+        progress_type = item.get("progress_type")
+        items.append({
+            "progress_type": progress_type,
+            "before_state": item.get("before_state"),
+            "allowed_fields": list(PLAN_BEFORE_STATE_FIELDS.get(progress_type) or ()),
+        })
+    return items
 
 
 def validate_scene_plan_against_input(response, input_payload):
