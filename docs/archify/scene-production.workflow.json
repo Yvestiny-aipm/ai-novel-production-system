@@ -35,7 +35,7 @@
     "requiredPaths": [{ "from": "brief", "to": "next" }]
   },
   "nodes": [
-    { "id": "brief", "lane": "desk", "col": 0, "type": "external", "label": "CreativeBrief", "sublabel": "确认后只读" },
+    { "id": "brief", "lane": "desk", "col": 0, "type": "external", "label": "设定摘录", "sublabel": "当前测试写定" },
     { "id": "pack", "lane": "desk", "col": 1, "type": "database", "label": "ContextPack", "sublabel": "当场只读快照" },
     { "id": "planning", "lane": "run", "col": 1, "type": "backend", "label": "规划 Agent", "sublabel": "ScenePlan" },
     { "id": "writing", "lane": "run", "col": 2, "type": "backend", "label": "生文 Agent", "sublabel": "ProseDraft" },
@@ -48,7 +48,7 @@
     { "id": "blocked", "lane": "gate", "col": 5, "type": "security", "label": "阻断", "sublabel": "次数用尽或技术异常" }
   ],
   "edges": [
-    { "id": "brief-pack", "from": "brief", "to": "pack", "label": "注入作品规则" },
+    { "id": "brief-pack", "from": "brief", "to": "pack", "label": "注入设定摘录" },
     { "id": "pack-plan", "from": "pack", "to": "planning", "label": "组装规划包" },
     { "id": "plan-write", "from": "planning", "to": "writing", "label": "规划通过", "variant": "emphasis" },
     { "id": "write-gates", "from": "writing", "to": "gates", "label": "交正文" },
