@@ -17,9 +17,7 @@
     { "id": "draft", "label": "生文过关", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
     { "id": "commit", "label": "审查入库", "fromCol": 4, "toCol": 5 }
   ],
-  "groups": [
-    { "id": "gate_band", "label": "确定性关卡在三审前", "lane": "gate", "fromCol": 2, "toCol": 3, "variant": "security" }
-  ],
+  "groups": [],
   "mainPath": [
     "brief",
     "pack",
@@ -42,7 +40,7 @@
     { "id": "planning", "lane": "run", "col": 1, "type": "backend", "label": "规划 Agent", "sublabel": "ScenePlan" },
     { "id": "writing", "lane": "run", "col": 2, "type": "backend", "label": "生文 Agent", "sublabel": "ProseDraft" },
     { "id": "gates", "lane": "gate", "col": 2, "type": "security", "label": "确定性关卡", "sublabel": "字数重复 Canon", "tag": "代码拦截" },
-    { "id": "reviews", "lane": "run", "col": 3, "type": "backend", "label": "三审", "sublabel": "世界 / 剧情 / 语言" },
+    { "id": "reviews", "lane": "run", "col": 3, "type": "backend", "label": "独立三审", "sublabel": "世界 / 剧情 / 语言" },
     { "id": "memory", "lane": "run", "col": 4, "type": "backend", "label": "记忆 Agent", "sublabel": "MemoryProposal" },
     { "id": "confirm", "lane": "gate", "col": 4, "type": "security", "label": "人工确认", "sublabel": "正式设定不自动写" },
     { "id": "next", "lane": "desk", "col": 5, "type": "database", "label": "下场读取", "sublabel": "账本 + 此刻状态" },
@@ -68,16 +66,16 @@
       "dot": "cyan",
       "title": "统一后端控流程",
       "items": [
-        "Agent 只交任务类型和 ContextPack，不直接调模型或改库",
-        "Harness 负责路由、重试、Contract 校验和 harness_calls"
+        "后端转交规划卡、正文、三份审查意见与记忆提案；Agent 不互调",
+        "Harness 独立调用模型、校验结果并记录每次调用"
       ]
     },
     {
       "dot": "rose",
       "title": "关卡先于三审",
       "items": [
-        "字数失败只回 Writing；内容失败计数，第三次回 Planning",
-        "场景事实可自动写，叙事事件和世界规则必须人审"
+        "字数失败只回生文；内容失败返工，严重或跨场冲突请裁决 Agent",
+        "场景事实可自动写；叙事事件、世界规则、人物细节需人审"
       ]
     }
   ]

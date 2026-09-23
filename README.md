@@ -1,134 +1,93 @@
-# AI Novel Production System
+# AI 长篇小说生产系统
 
-面向内部团队的长篇小说生产系统。第一版按“场”生产：规划、正文、确定性关卡、三审、记忆、人工确认、断点恢复和版本历史都可追溯、可校验、可恢复。不接入 n8n。
+这是给内部内容团队使用的长篇小说生产工具。团队先确认一部作品的创作要求，系统再按“场”规划、写作、检查和保存。它关注三件事：每场能接上前文，问题能回到正确环节返工，正式设定的变化有人把关。
 
 仓库：<https://github.com/solve-context/ai-novel-production-system>
 
-## 当前状态
+## 产品现状
 
-`v0.1.0` 是第一版本地验收基线（五场真实模型链路 + 隔离备份恢复）。在此之上已经完成连续四十场规模测试；160 场全书生产和生产环境的每日备份、保留策略、告警尚未开始。密钥和真实测试库不入库。
+- **生产单位是场。** 目标每场约 1250 个非空白字符，每章两场；全书规划约 80 章、160 场、20 万字。当前没有独立的全书大纲生成层，规划按场推进。
+- **已验证的范围。** `v0.1.0` 完成五场真实模型链路与隔离备份恢复验收，随后完成四十场连续规模测试。160 场全书生产尚未完成，因此不能把全书目标写成已达成结果。
+- **当前运行形态。** 场次生产主流程在 `integration/recovery.py`；工作台目前提供任务状态和操作入口，尚不是覆盖完整生产流程的产品界面。`systems/` 下四个目录是职责说明，不是四套独立服务。
+- **模型可以替换。** 未指定供应商时，代码默认走硅基流动。2026-09-23 的测试路由方案是写作、记忆使用 Azure Foundry 的 Claude Opus 5.5，规划、审查、裁决使用 OpenAI 的 GPT-6 Sol；实际调用仍取决于本机配置。
 
-生产单位是场，不是章。单场目标约 1250 字（去空白），硬关卡 800～2300 字；每章两场；全书目标约 80 章 / 160 场 / 20 万字。当前没有独立的全书大纲层，规划是当场、逐场生成的。
+## 一场是怎样完成的
 
-模型路由（2026-09-23 暂定）：生文和记忆走 Azure Foundry Claude Opus 5.5；规划、三审、裁决走 GPT-6 Sol。空环境仍默认硅基流动。
+1. 团队确认作品初始资料。后端组合当场资料包，纳入已确认的规则、上一场结尾状态和已成立事实；待确认的记忆提案不会混入。
+2. **规划 Agent** 写出这一场的目标、推进要求和写作安排。后端检查规划是否可用于写作，以及是否与近期场次实质重复。
+3. **生文 Agent** 收到资料包和通过检查的规划卡，写出正文。代码按正文实际内容计算非空白字符数；当前通过范围是 **800～2300**，目标约 **1250**。之后再查重、核对人物与设定、已成立事实和世界状态。
+4. 正文过关后，**世界审查、剧情审查、语言审查**三位 Agent 分别看同一份资料包、规划和正文，独立提交意见；他们互相看不到对方的意见。后端汇总三份结果，检查这一场是否真的完成了规划中的剧情推进。
+5. 如果出现严重问题、跨场影响或真实冲突，后端再请**裁决 Agent**处理审查分歧；普通场次不调用它。审查未通过则按原因返工。
+6. 通过后，**记忆 Agent**根据正文和最终审查报告提出一条记忆变更建议。场景事实符合权限规则时可自动保存；叙事事件、世界规则和人物细节等待人工确认。没有需要记录的变化时，本场也可完成。
+7. 本场完成后，下一场读取已确认的结尾状态和事实账本，继续生产。
 
-## 整场工作流
+![一场小说的生产流程](docs/archify/scene-production-workflow.png)
 
-每场走同一条主链路：只读 `CreativeBrief` 注入作品规则，组装当场 `ContextPack`，规划出 `ScenePlan`，写出 `ProseDraft`，先过确定性关卡，再由互相隔离的三位审查员出 `QualityReport`，记忆 Agent 提出 `MemoryProposal`，正式设定必须人审，本场 `completed` 后下场再读账本和此刻状态。
+**[下载可交互流程图](docs/archify/scene-production-workflow.html)**：在浏览器打开 HTML，可缩放、搜索节点、追踪关系和切换明暗主题。GitHub 的 README 只展示上面的静态预览图；私有仓库中的 HTML 需下载到本机打开。图的可编辑源文件是 [Archify 流程定义](docs/archify/scene-production.workflow.json)。
 
-关卡或审查失败回返工（字数失败只回 Writing；内容失败计数，第三次回 Planning）。次数用尽或技术异常阻断，不自动救内容。
+## Agent 怎样联系、传递什么
 
-![长篇生产主链路](docs/archify/scene-production-workflow.png)
+Agent 不直接互相发消息，也不能自行改数据库。**统一后端**决定调用顺序，把上一环节的结果放进下一环节的输入；**Harness**为每次任务独立选择模型、处理技术重试、检查返回格式并记录调用。下面的箭头表示后端转交信息，而非 Agent 直接调用。
 
-可交互图：[长篇生产主链路](docs/archify/scene-production-workflow.html)（源文件 `docs/archify/scene-production.workflow.json`）。
+| 环节 | 收到什么 | 交出什么、交给谁 |
+|---|---|---|
+| 规划 Agent | 当场资料包；从第二场起还有上一场状态与剧情推进基线；返工时收到规划修改意见 | 场景规划卡 `ScenePlan` → 后端检查 → 生文 Agent |
+| 生文 Agent | 当场资料包、已通过的 `ScenePlan`；返工时收到上版字数或质量问题 | 正文草稿 `ProseDraft` → 后端字数、重复和设定关卡 → 三位审查 Agent |
+| 世界审查 Agent | 同一份资料包、规划卡、正文 | 世界设定与前后事实的审查意见 → 后端汇总 |
+| 剧情审查 Agent | 同一份资料包、规划卡、正文 | 人物与剧情推进的审查意见，以及本场结束状态 → 后端汇总 |
+| 语言审查 Agent | 同一份资料包、规划卡、正文 | 语言和阅读体验的审查意见 → 后端汇总 |
+| 裁决 Agent（按需） | 资料包、规划卡、正文、三份原始意见及后端初步汇总 | 裁决后的 `QualityReport` → 后端继续核对剧情推进，决定通过或返工 |
+| 记忆 Agent | 资料包、通过的正文、最终 `QualityReport` | `MemoryProposal` → 后端检查写入权限 → 自动保存或等待人工确认 |
 
-Agent 只能读取当前任务的 ContextPack，并通过 Harness 发出独立模型请求；Agent 不直接访问模型、数据库或其他 Agent。Harness 负责模型路由、调用隔离、重试、Contract 校验与 `harness_calls` 审计。三位审查员互相隔离，后端才会汇总 QualityReport。场景事实可自动写入；叙事事件、世界规则和人物细节必须按权限进入人工确认。裁决只在严重、跨场或真实冲突时调用。
+三位审查员先各自产出一份 `ReviewerResult`，后端再合并成 `QualityReport`；剧情审查给出的结束状态是后续核对的重要依据。裁决仅在严重、跨场或冲突情形触发。内容失败通常先让生文返工；同一轮规划下第三次内容失败回到规划，后续仍失败则阻断。字数失败只回生文，单轮规划最多四次；技术异常进入待处理队列。所有历史版本和调用记录保留，恢复时只复用输入完全匹配的成功结果。
 
-## 项目结构
+## 英文名称与系统用语
 
-- `backend/`：Harness、Agent 适配、ContextPack、关卡、任务状态、记忆确认、备份恢复和测试。
-- `contracts/`：七类业务 Contract Schema 与枚举。
-- `db/migrations/`：SQLite 结构迁移。
-- `integration/`：真实测试、夹具、恢复和备份命令。
-- `acceptance/`：固定 Mock 验收分支。
-- `frontend/`：创作工作台和管理页面原型。
-- `docs/`：方案、交接说明、验收报告、架构说明和工作流成图。
+| 名称 | 在这个产品里是什么意思 |
+|---|---|
+| AI / Agent | 人工智能；Agent 是只完成一种明确任务的模型角色，例如规划或审查。 |
+| CreativeBrief | 团队确认的作品初始资料，包括创作方向和基础规则。 |
+| ContextPack | 后端为某次任务整理的只读资料包，带来源与版本；Agent 只读它。 |
+| ScenePlan | 一场的规划卡，说明要写什么、如何推进。 |
+| ProseDraft | 生文 Agent 交出的正文草稿。 |
+| ReviewerResult / QualityReport | 前者是单个审查员的意见；后者是后端汇总或裁决后的整场审查报告。 |
+| MemoryProposal | 记忆 Agent 提出的事实或设定变更建议；提议本身不等于已正式写入。 |
+| TaskState | 一场任务现在处于哪一步、是否等待确认或阻断，以及下一步动作。 |
+| Harness | 统一的模型调用层：选模型、重试、核对结果格式、留下调用记录。 |
+| Contract / Schema | 环节交接时约定的数据格式；Schema 是格式的机器可读规则。 |
+| Canon | 已确认且后续写作必须遵守的人物、世界和事实设定。 |
+| Archify / HTML | Archify 是生成本页流程图的工具；HTML 是可在浏览器打开的交互文件格式。 |
+| API / REST | 工作台向后端查询任务或提交操作的接口；REST 是这里使用的接口组织方式。 |
+| Python / SQLite | 后端使用的编程语言和本地数据库。 |
+| Mock | 用预设的模拟结果验证流程分支，不消耗真实模型调用。 |
+| Azure Foundry / Claude Opus 5.5 / OpenAI / GPT-6 Sol / 硅基流动 / DeepSeek | 可配置的模型平台或模型名称；它们是执行 Agent 任务的供应来源，不改变 Agent 分工。 |
+| GitHub | 本项目保存代码和文档的组织仓库。 |
+| Planning / Writing / completed | 图中的“规划 / 写作 / 本场已完成”状态或环节。 |
+| `.env` / `RUN_REAL_MODEL` / `REAL_TEST_AUTO_CONFIRM` / `not_run` | 分别是本机配置文件、真实模型测试开关、测试代确认开关，以及未启动真实测试时的返回状态。 |
 
-## 安装与本地运行
+## 本地查看与运行
 
-需要 Python 3.11+。不要把密钥写入代码、文档或 Git。一键启动会创建 `.venv`、安装依赖、初始化本地库，并在同一端口提供前端和 API：
+需要 Python 3.11+。把密钥放在本机 `.env` 或终端环境变量中；`.env` 不进入仓库。
 
 ```sh
 cp -n .env.example .env
 ./scripts/dev_up.sh
 ```
 
-浏览器打开 `http://127.0.0.1:8124/`（工作台）或 `http://127.0.0.1:8124/admin.html`（管理后台）。健康检查：`http://127.0.0.1:8124/healthz`。
+打开 `http://127.0.0.1:8124/` 查看工作台，或打开 `http://127.0.0.1:8124/admin.html` 查看管理页。`./scripts/dev_check.sh` 检查服务，`./scripts/dev_down.sh` 停止服务。页面当前主要支持查看任务状态，以及暂停、恢复、重新规划、重新生文和取消等操作。
 
-```sh
-./scripts/dev_check.sh
-./scripts/dev_down.sh
-```
+真实模型规模测试使用独立的新数据库，并由 `integration/run_real_test.py` 启动；所需模型密钥和供应商路由见 [真实测试说明](integration/README.md)。未设置 `RUN_REAL_MODEL=1` 或缺少当前路由的密钥时，运行器返回 `not_run`。`REAL_TEST_AUTO_CONFIRM=1` 仅用于测试操作员代确认提案，不代表 Agent 可自行批准正式设定。
 
-密钥和公司 Foundry 地址只放在本机 `.env` 或当前终端环境变量中；`.env` 已被 Git 忽略。手动安装仍然可用：
+## 仓库地图
 
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-./db/init.sh ./data/novel.db
-python -m py_compile backend/*.py integration/*.py
-PYTHONPATH=. python acceptance/run_cases.py
-```
+| 目录 | 用途 |
+|---|---|
+| `backend/` | 场次规则、Agent 调用、资料包、任务状态、记忆确认和测试 |
+| `contracts/` | 七类业务交接内容的数据约定 |
+| `integration/` | 真实模型运行器、场次恢复和备份操作 |
+| `acceptance/` | 不调用真实模型的固定场景验收 |
+| `frontend/` | 创作工作台与管理页原型 |
+| `db/`、`data/` | 数据库结构；本地运行数据与备份保存在 `data/`，不入库 |
+| `docs/`、`systems/` | 方案、验收、流程图和逻辑职责说明 |
 
-`data/` 下的运行数据库、真实模型样本、备份和恢复副本均被 Git 忽略。
-
-## 环境变量与真实模型测试
-
-密钥只从环境变量读取。未设置 `WRITING_PROVIDER` 时默认仍走硅基流动。规模测试用新库，不要改已经跑完的库。以下值是占位符：
-
-```sh
-export RUN_REAL_MODEL=1
-export EXECUTION_MODE=sequential
-export REAL_TEST_DB="$PWD/data/real_test.db"
-export WRITING_PROVIDER=azure_foundry
-export MEMORY_PROVIDER=azure_foundry
-export PLANNING_PROVIDER=openai
-export REVIEW_PROVIDER=openai
-export ARBITER_PROVIDER=openai
-export AZURE_FOUNDRY_CLAUDE_ENDPOINT="https://<your-foundry-resource>.services.ai.azure.com/anthropic"
-export AZURE_FOUNDRY_CLAUDE_DEPLOYMENT="<your-foundry-deployment>"
-export AZURE_FOUNDRY_CLAUDE_API_KEY="<your-foundry-api-key>"
-export OPENAI_API_KEY="<your-openai-api-key>"
-export OPENAI_DEFAULT_MODEL=gpt-6-sol
-python3 integration/run_real_test.py
-```
-
-`REAL_TEST_AUTO_CONFIRM=1` 只表示测试操作员代为确认记忆提案，不是 Agent 自行写入正式设定。未设置 `RUN_REAL_MODEL=1` 或当前路由所需密钥时，runner 只返回 `not_run`。
-
-## Mock 与回归测试
-
-```sh
-PYTHONPATH=. python3 acceptance/run_cases.py
-PYTHONPATH=. python3 backend/test_recovery_preserves_history.py
-PYTHONPATH=. python3 backend/test_immutable_business_records.py
-PYTHONPATH=. python3 backend/test_backup_restore.py
-PYTHONPATH=. python3 backend/test_azure_foundry.py
-PYTHONPATH=. python3 backend/test_foundry_routing.py
-```
-
-## 备份与恢复
-
-备份不保存 API Key；清单会记录数据库、Contract、枚举、模型配置引用和迁移文件的 SHA-256。
-
-```sh
-PYTHONPATH=. python3 integration/manage_backup.py create \
-  --source-db data/real_test_resume_33_prepared.db \
-  --backup-root data/backups \
-  --backup-id local-backup-001
-
-PYTHONPATH=. python3 integration/manage_backup.py verify \
-  --backup data/backups/local-backup-001
-
-PYTHONPATH=. python3 integration/manage_backup.py restore \
-  --backup data/backups/local-backup-001 \
-  --target-db data/restores/local-backup-001.db
-```
-
-恢复拒绝覆盖已有目标；单条历史记录或单场恢复时，同编号不同内容会失败，不会替换既有数据。
-
-## 当前限制与下一阶段
-
-- 四十场连续规模测试已跑通；尚未完成 160 场全书生产，不能声称已稳定产出 20 万字。
-- 没有独立的全书大纲 / 部卷规划层，当场规划容易在同一处反复微调。
-- 每日备份调度、保留清理、失败告警和生产管理后台仍需在部署环境配置。
-
-## 方案文档
-
-- [系统架构 README（本项目）](docs/系统架构README-本项目.md)
-- [系统架构 README（竞品对照）](docs/系统架构README-竞品.md)
-- [第一版本地验收发布说明](docs/第一版本地验收发布说明-v0.1.0.md)
-- [方案基线 V1](docs/方案基线-v1.md)
-- [Contract 说明](contracts/README.md)
-
-旧系统只迁移通用规则、字段经验、测试案例和失败样本；不迁移 n8n 编排、旧数据库、故事专属硬编码或旧系统边界。
+进一步阅读：[本项目架构说明](docs/系统架构README-本项目.md) · [业务交接格式](contracts/README.md) · [第一版本地验收说明](docs/第一版本地验收发布说明-v0.1.0.md)。

@@ -5130,7 +5130,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read"
          data-preset-badge-editorial-plate="ARCHIFY / 图版 04">
-      <svg viewBox="0 0 926 542" role="img" lang="zh-CN" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
+      <svg viewBox="0 0 926 534" role="img" lang="zh-CN" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
         <title id="archify-diagram-title">长篇生产主链路</title>
         <desc id="archify-diagram-description">由 Archify 生成的工作流图。</desc>
         <!-- Definitions -->
@@ -5162,8 +5162,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-1" x="40" y="178" width="870" height="106" rx="10" class="c-lane" stroke-width="1"/>
         <text x="54" y="200" class="t-dim" font-size="10" font-weight="600">02 / 场次生产</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-2" x="40" y="304" width="870" height="114" rx="10" class="c-lane" stroke-width="1"/>
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="exception-lane" data-composition-frame-id="lane-2-exception" x="46" y="310" width="858" height="102" rx="8" class="c-security-group" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="lane" data-composition-frame-id="lane-2" x="40" y="304" width="870" height="106" rx="10" class="c-lane" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="exception-lane" data-composition-frame-id="lane-2-exception" x="46" y="310" width="858" height="94" rx="8" class="c-security-group" stroke-width="1"/>
         <text x="54" y="326" class="t-security" font-size="10" font-weight="600">EX / 关卡与人审</text>
 
         <!-- Phase headers -->
@@ -5178,22 +5178,21 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text x="791.1999999999999" y="39" class="t-muted" font-size="8" font-weight="600" text-anchor="middle">审查入库</text>
 
         <!-- Workflow groups -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="group" data-composition-frame-id="group-0" x="388.79999999999995" y="342" width="220" height="72" rx="9" class="c-security-group" stroke-width="1"/>
-        <text x="398.79999999999995" y="340" class="t-security" font-size="7" font-weight="600">确定性关卡在三审前</text>
+
 
         <!-- Edge paths -->
         <path data-edge-from="brief" data-edge-to="pack" data-edge-label="注入作品规则" data-edge-key="0" data-edge-id="brief-pack" data-composition-points="140,120;215.60000000000002,120" d="M 140 120 L 215.60000000000002 120" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="confirm" data-edge-to="next" data-edge-label="本场 completed" data-edge-key="1" data-edge-id="confirm-next" data-composition-points="777.1999999999999,379;793.1999999999999,379;793.1999999999999,235;851.1999999999999,235;851.1999999999999,146" d="M 777.1999999999999 379 L 793.1999999999999 379 L 793.1999999999999 235 L 851.1999999999999 235 L 851.1999999999999 146" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="gates" data-edge-to="reviews" data-edge-label="关卡通过" data-edge-key="2" data-edge-id="gates-reviews" data-composition-points="484.8,372;558.8,372;558.8,272" d="M 484.8 372 L 558.8 372 L 558.8 272" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="gates" data-edge-to="rework" data-edge-label="关卡或审查失败" data-edge-key="3" data-edge-id="gates-rework" data-composition-points="438.8,413;438.8,434;261.6,434;261.6,405" d="M 438.8 413 L 438.8 434 L 261.6 434 L 261.6 405" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="memory" data-edge-to="confirm" data-edge-label="提案" data-edge-key="4" data-edge-id="memory-confirm" data-composition-points="777.1999999999999,246;793.1999999999999,246;793.1999999999999,294;731.1999999999999,294;731.1999999999999,353" d="M 777.1999999999999 246 L 793.1999999999999 246 L 793.1999999999999 294 L 731.1999999999999 294 L 731.1999999999999 353" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="confirm" data-edge-to="next" data-edge-label="本场 completed" data-edge-key="1" data-edge-id="confirm-next" data-composition-points="777.1999999999999,372;793.1999999999999,372;793.1999999999999,231;851.1999999999999,231;851.1999999999999,146" d="M 777.1999999999999 372 L 793.1999999999999 372 L 793.1999999999999 231 L 851.1999999999999 231 L 851.1999999999999 146" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="gates" data-edge-to="reviews" data-edge-label="关卡通过" data-edge-key="2" data-edge-id="gates-reviews" data-composition-points="484.8,365;558.8,365;558.8,272" d="M 484.8 365 L 558.8 365 L 558.8 272" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="gates" data-edge-to="rework" data-edge-label="关卡或审查失败" data-edge-key="3" data-edge-id="gates-rework" data-composition-points="438.8,406;438.8,426;261.6,426;261.6,398" d="M 438.8 406 L 438.8 426 L 261.6 426 L 261.6 398" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="memory" data-edge-to="confirm" data-edge-label="提案" data-edge-key="4" data-edge-id="memory-confirm" data-composition-points="777.1999999999999,246;793.1999999999999,246;793.1999999999999,294;731.1999999999999,294;731.1999999999999,346" d="M 777.1999999999999 246 L 793.1999999999999 246 L 793.1999999999999 294 L 731.1999999999999 294 L 731.1999999999999 346" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <path data-edge-from="next" data-edge-to="pack" data-edge-label="下场 ContextPack" data-edge-key="5" data-edge-id="next-pack" data-composition-points="805.1999999999999,120;307.6,120" d="M 805.1999999999999 120 L 307.6 120" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="pack" data-edge-to="planning" data-edge-label="组装规划包" data-edge-key="6" data-edge-id="pack-plan" data-composition-points="307.6,120;323.6,120;323.6,168;261.6,168;261.6,220" d="M 307.6 120 L 323.6 120 L 323.6 168 L 261.6 168 L 261.6 220" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <path data-edge-from="planning" data-edge-to="writing" data-edge-label="规划通过" data-edge-key="7" data-edge-id="plan-write" data-composition-points="307.6,246;392.8,246" d="M 307.6 246 L 392.8 246" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="reviews" data-edge-to="memory" data-edge-label="QualityReport" data-edge-key="8" data-edge-id="reviews-memory" data-composition-points="604.8,246;685.1999999999999,246" d="M 604.8 246 L 685.1999999999999 246" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="rework" data-edge-to="blocked" data-edge-label="次数用尽" data-edge-key="9" data-edge-id="rework-blocked" data-composition-points="261.6,405;261.6,434;851.1999999999999,434;851.1999999999999,405" d="M 261.6 405 L 261.6 434 L 851.1999999999999 434 L 851.1999999999999 405" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="rework" data-edge-to="writing" data-edge-label="重写" data-edge-key="10" data-edge-id="rework-write" data-composition-points="261.6,353;261.6,298;438.8,298;438.8,272" d="M 261.6 353 L 261.6 298 L 438.8 298 L 438.8 272" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="writing" data-edge-to="gates" data-edge-label="交正文" data-edge-key="11" data-edge-id="write-gates" data-composition-points="438.8,272;438.8,294;376.8,294;376.8,379;392.8,379" d="M 438.8 272 L 438.8 294 L 376.8 294 L 376.8 379 L 392.8 379" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="rework" data-edge-to="blocked" data-edge-label="次数用尽" data-edge-key="9" data-edge-id="rework-blocked" data-composition-points="261.6,398;261.6,426;851.1999999999999,426;851.1999999999999,398" d="M 261.6 398 L 261.6 426 L 851.1999999999999 426 L 851.1999999999999 398" class="a-security" stroke-width="1.4" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="rework" data-edge-to="writing" data-edge-label="重写" data-edge-key="10" data-edge-id="rework-write" data-composition-points="261.6,346;261.6,294;438.8,294;438.8,272" d="M 261.6 346 L 261.6 294 L 438.8 294 L 438.8 272" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="writing" data-edge-to="gates" data-edge-label="交正文" data-edge-key="11" data-edge-id="write-gates" data-composition-points="484.8,246;500.8,246;500.8,294;438.8,294;438.8,338" d="M 484.8 246 L 500.8 246 L 500.8 294 L 438.8 294 L 438.8 338" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
 
         <!-- Nodes -->
         <g id="node-brief" data-node-id="brief" data-node-label="CreativeBrief" tabindex="0" role="button" aria-label="聚焦CreativeBrief，确认后只读, 作品资料 › 规划" aria-pressed="false" data-node-kind="external" data-node-sublabel="确认后只读" data-node-context="作品资料 › 规划">
@@ -5254,14 +5253,14 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <text data-detail="context" x="438.8" y="258" class="t-muted" font-size="8" text-anchor="middle">ProseDraft</text>
         </g>
 
-        <g id="node-reviews" data-node-id="reviews" data-node-label="三审" tabindex="0" role="button" aria-label="聚焦三审，世界 / 剧情 / 语言, 场次生产 › 生文过关" aria-pressed="false" data-node-kind="backend" data-node-sublabel="世界 / 剧情 / 语言" data-node-context="场次生产 › 生文过关">
-          <title>三审 · 世界 / 剧情 / 语言 · 场次生产 › 生文过关</title>
+        <g id="node-reviews" data-node-id="reviews" data-node-label="独立三审" tabindex="0" role="button" aria-label="聚焦独立三审，世界 / 剧情 / 语言, 场次生产 › 生文过关" aria-pressed="false" data-node-kind="backend" data-node-sublabel="世界 / 剧情 / 语言" data-node-context="场次生产 › 生文过关">
+          <title>独立三审 · 世界 / 剧情 / 语言 · 场次生产 › 生文过关</title>
           <rect x="512.8" y="220" width="92" height="52" rx="6" class="c-mask"/>
           <rect x="512.8" y="220" width="92" height="52" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(518.8 226) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="558.8" y="241" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">三审</text>
+          <text data-node-label="" data-detail-anchor="" x="558.8" y="241" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">独立三审</text>
           <text data-detail="context" x="558.8" y="258" class="t-muted" font-size="7.7" text-anchor="middle">世界 / 剧情 / 语言</text>
         </g>
 
@@ -5278,53 +5277,53 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
         <g id="node-rework" data-node-id="rework" data-node-label="返工" tabindex="0" role="button" aria-label="聚焦返工，回 Writing 或 Planning, 关卡与人审 › 规划" aria-pressed="false" data-node-kind="messagebus" data-node-sublabel="回 Writing 或 Planning" data-node-context="关卡与人审 › 规划">
           <title>返工 · 回 Writing 或 Planning · 关卡与人审 › 规划</title>
-          <rect x="215.60000000000002" y="353" width="92" height="52" rx="6" class="c-mask"/>
-          <rect x="215.60000000000002" y="353" width="92" height="52" rx="6" class="c-messagebus" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(221.60000000000002 359) scale(0.6875)">
+          <rect x="215.60000000000002" y="346" width="92" height="52" rx="6" class="c-mask"/>
+          <rect x="215.60000000000002" y="346" width="92" height="52" rx="6" class="c-messagebus" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="messagebus" class="semantic-sigil s-messagebus" transform="translate(221.60000000000002 352) scale(0.6875)">
             <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/>
             <circle cx="5" cy="4.5" r="1" class="sigil-fill"/>
             <circle cx="10.5" cy="8" r="1" class="sigil-fill"/>
             <circle cx="7" cy="11.5" r="1" class="sigil-fill"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="261.6" y="374" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">返工</text>
-          <text data-detail="context" x="261.6" y="391" class="t-muted" font-size="6.3" text-anchor="middle">回 Writing 或 Planning</text>
+          <text data-node-label="" data-detail-anchor="" x="261.6" y="367" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">返工</text>
+          <text data-detail="context" x="261.6" y="384" class="t-muted" font-size="6.3" text-anchor="middle">回 Writing 或 Planning</text>
         </g>
 
-        <g id="node-gates" data-node-id="gates" data-node-label="确定性关卡" tabindex="0" role="button" aria-label="聚焦确定性关卡，字数重复 Canon, 关卡与人审 › 确定性关卡在三审前 › 生文过关" aria-pressed="false" data-node-kind="security" data-node-sublabel="字数重复 Canon" data-node-tag="代码拦截" data-node-context="关卡与人审 › 确定性关卡在三审前 › 生文过关">
-          <title>确定性关卡 · 字数重复 Canon · 关卡与人审 › 确定性关卡在三审前 › 生文过关 · 代码拦截</title>
-          <rect x="392.8" y="345" width="92" height="68" rx="6" class="c-mask"/>
-          <rect x="392.8" y="345" width="92" height="68" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(398.8 351) scale(0.6875)">
+        <g id="node-gates" data-node-id="gates" data-node-label="确定性关卡" tabindex="0" role="button" aria-label="聚焦确定性关卡，字数重复 Canon, 关卡与人审 › 生文过关" aria-pressed="false" data-node-kind="security" data-node-sublabel="字数重复 Canon" data-node-tag="代码拦截" data-node-context="关卡与人审 › 生文过关">
+          <title>确定性关卡 · 字数重复 Canon · 关卡与人审 › 生文过关 · 代码拦截</title>
+          <rect x="392.8" y="338" width="92" height="68" rx="6" class="c-mask"/>
+          <rect x="392.8" y="338" width="92" height="68" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(398.8 344) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="438.8" y="366" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">确定性关卡</text>
-          <text data-detail="context" x="438.8" y="383" class="t-muted" font-size="8" text-anchor="middle">字数重复 Canon</text>
-        <text data-detail="fine" x="438.8" y="401" class="t-security" font-size="7" text-anchor="middle">代码拦截</text>
+          <text data-node-label="" data-detail-anchor="" x="438.8" y="359" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">确定性关卡</text>
+          <text data-detail="context" x="438.8" y="376" class="t-muted" font-size="8" text-anchor="middle">字数重复 Canon</text>
+        <text data-detail="fine" x="438.8" y="394" class="t-security" font-size="7" text-anchor="middle">代码拦截</text>
         </g>
 
         <g id="node-confirm" data-node-id="confirm" data-node-label="人工确认" tabindex="0" role="button" aria-label="聚焦人工确认，正式设定不自动写, 关卡与人审 › 审查入库" aria-pressed="false" data-node-kind="security" data-node-sublabel="正式设定不自动写" data-node-context="关卡与人审 › 审查入库">
           <title>人工确认 · 正式设定不自动写 · 关卡与人审 › 审查入库</title>
-          <rect x="685.1999999999999" y="353" width="92" height="52" rx="6" class="c-mask"/>
-          <rect x="685.1999999999999" y="353" width="92" height="52" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(691.1999999999999 359) scale(0.6875)">
+          <rect x="685.1999999999999" y="346" width="92" height="52" rx="6" class="c-mask"/>
+          <rect x="685.1999999999999" y="346" width="92" height="52" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(691.1999999999999 352) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="731.1999999999999" y="374" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">人工确认</text>
-          <text data-detail="context" x="731.1999999999999" y="391" class="t-muted" font-size="8" text-anchor="middle">正式设定不自动写</text>
+          <text data-node-label="" data-detail-anchor="" x="731.1999999999999" y="367" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">人工确认</text>
+          <text data-detail="context" x="731.1999999999999" y="384" class="t-muted" font-size="8" text-anchor="middle">正式设定不自动写</text>
         </g>
 
         <g id="node-blocked" data-node-id="blocked" data-node-label="阻断" tabindex="0" role="button" aria-label="聚焦阻断，次数用尽或技术异常, 关卡与人审 › 审查入库" aria-pressed="false" data-node-kind="security" data-node-sublabel="次数用尽或技术异常" data-node-context="关卡与人审 › 审查入库">
           <title>阻断 · 次数用尽或技术异常 · 关卡与人审 › 审查入库</title>
-          <rect x="805.1999999999999" y="353" width="92" height="52" rx="6" class="c-mask"/>
-          <rect x="805.1999999999999" y="353" width="92" height="52" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(811.1999999999999 359) scale(0.6875)">
+          <rect x="805.1999999999999" y="346" width="92" height="52" rx="6" class="c-mask"/>
+          <rect x="805.1999999999999" y="346" width="92" height="52" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(811.1999999999999 352) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="851.1999999999999" y="374" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">阻断</text>
-          <text data-detail="context" x="851.1999999999999" y="391" class="t-muted" font-size="7.7" text-anchor="middle">次数用尽或技术异常</text>
+          <text data-node-label="" data-detail-anchor="" x="851.1999999999999" y="367" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">阻断</text>
+          <text data-detail="context" x="851.1999999999999" y="384" class="t-muted" font-size="7.7" text-anchor="middle">次数用尽或技术异常</text>
         </g>
 
         <!-- Edge labels -->
@@ -5333,16 +5332,16 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <text x="177.8" y="110" class="t-muted" font-size="8" text-anchor="middle">注入作品规则</text>
         </g>
         <g data-detail="context" data-edge-from="confirm" data-edge-to="next" data-edge-label="本场 completed" data-edge-key="1" data-edge-id="confirm-next">
-          <rect x="783.5999999999999" y="215" width="77.2" height="14" rx="3" class="c-mask"/>
-          <text x="822.1999999999999" y="225" class="t-backend" font-size="8" text-anchor="middle">本场 completed</text>
+          <rect x="783.5999999999999" y="211" width="77.2" height="14" rx="3" class="c-mask"/>
+          <text x="822.1999999999999" y="221" class="t-backend" font-size="8" text-anchor="middle">本场 completed</text>
         </g>
         <g data-detail="context" data-edge-from="gates" data-edge-to="reviews" data-edge-label="关卡通过" data-edge-key="2" data-edge-id="gates-reviews">
-          <rect x="497.59999999999997" y="352" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="521.8" y="362" class="t-backend" font-size="8" text-anchor="middle">关卡通过</text>
+          <rect x="497.59999999999997" y="345" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="521.8" y="355" class="t-backend" font-size="8" text-anchor="middle">关卡通过</text>
         </g>
         <g data-detail="context" data-edge-from="gates" data-edge-to="rework" data-edge-label="关卡或审查失败" data-edge-key="3" data-edge-id="gates-rework">
-          <rect x="311.6" y="414" width="77.2" height="14" rx="3" class="c-mask"/>
-          <text x="350.20000000000005" y="424" class="t-security" font-size="8" text-anchor="middle">关卡或审查失败</text>
+          <rect x="311.6" y="406" width="77.2" height="14" rx="3" class="c-mask"/>
+          <text x="350.20000000000005" y="416" class="t-security" font-size="8" text-anchor="middle">关卡或审查失败</text>
         </g>
         <g data-detail="context" data-edge-from="memory" data-edge-to="confirm" data-edge-label="提案" data-edge-key="4" data-edge-id="memory-confirm">
           <rect x="747.1999999999999" y="274" width="30" height="14" rx="3" class="c-mask"/>
@@ -5365,40 +5364,40 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <text x="645" y="236" class="t-muted" font-size="8" text-anchor="middle">QualityReport</text>
         </g>
         <g data-detail="context" data-edge-from="rework" data-edge-to="blocked" data-edge-label="次数用尽" data-edge-key="9" data-edge-id="rework-blocked">
-          <rect x="532.1999999999999" y="414" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="556.4" y="424" class="t-security" font-size="8" text-anchor="middle">次数用尽</text>
+          <rect x="532.1999999999999" y="406" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="556.4" y="416" class="t-security" font-size="8" text-anchor="middle">次数用尽</text>
         </g>
         <g data-detail="context" data-edge-from="rework" data-edge-to="writing" data-edge-label="重写" data-edge-key="10" data-edge-id="rework-write">
-          <rect x="335.20000000000005" y="278" width="30" height="14" rx="3" class="c-mask"/>
-          <text x="350.20000000000005" y="288" class="t-database" font-size="8" text-anchor="middle">重写</text>
+          <rect x="335.20000000000005" y="274" width="30" height="14" rx="3" class="c-mask"/>
+          <text x="350.20000000000005" y="284" class="t-database" font-size="8" text-anchor="middle">重写</text>
         </g>
         <g data-detail="context" data-edge-from="writing" data-edge-to="gates" data-edge-label="交正文" data-edge-key="11" data-edge-id="write-gates">
-          <rect x="388.40000000000003" y="274" width="38.8" height="14" rx="3" class="c-mask"/>
-          <text x="407.8" y="284" class="t-muted" font-size="8" text-anchor="middle">交正文</text>
+          <rect x="450.40000000000003" y="274" width="38.8" height="14" rx="3" class="c-mask"/>
+          <text x="469.8" y="284" class="t-muted" font-size="8" text-anchor="middle">交正文</text>
         </g>
 
         <!-- Legend -->
         <g data-legend="" data-legend-bridge="">
-          <text x="20" y="442" class="t-primary" font-size="12" font-weight="650">图例</text>
-          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Agent 逻辑" data-legend-x="20" data-legend-baseline="462" data-legend-width="87">
-            <rect x="20" y="454" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
-            <text x="42" y="462" class="t-muted" font-size="7.5" font-weight="500">Agent 逻辑</text>
+          <text x="20" y="434" class="t-primary" font-size="12" font-weight="650">图例</text>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Agent 逻辑" data-legend-x="20" data-legend-baseline="454" data-legend-width="87">
+            <rect x="20" y="446" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
+            <text x="42" y="454" class="t-muted" font-size="7.5" font-weight="500">Agent 逻辑</text>
           </g>
-          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="策略" data-legend-x="114" data-legend-baseline="462" data-legend-width="61">
-            <rect x="114" y="454" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
-            <text x="136" y="462" class="t-muted" font-size="7.5" font-weight="500">策略</text>
+          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="策略" data-legend-x="114" data-legend-baseline="454" data-legend-width="61">
+            <rect x="114" y="446" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
+            <text x="136" y="454" class="t-muted" font-size="7.5" font-weight="500">策略</text>
           </g>
-          <g data-legend-semantic-kind="messagebus" data-legend-kind="messagebus" data-legend-label="工具操作" data-legend-x="182" data-legend-baseline="462" data-legend-width="78">
-            <rect x="182" y="454" width="14" height="9" rx="2" class="c-messagebus" stroke-width="1"/>
-            <text x="204" y="462" class="t-muted" font-size="7.5" font-weight="500">工具操作</text>
+          <g data-legend-semantic-kind="messagebus" data-legend-kind="messagebus" data-legend-label="工具操作" data-legend-x="182" data-legend-baseline="454" data-legend-width="78">
+            <rect x="182" y="446" width="14" height="9" rx="2" class="c-messagebus" stroke-width="1"/>
+            <text x="204" y="454" class="t-muted" font-size="7.5" font-weight="500">工具操作</text>
           </g>
-          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="上下文 / 追踪" data-legend-x="267" data-legend-baseline="462" data-legend-width="100">
-            <rect x="267" y="454" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
-            <text x="289" y="462" class="t-muted" font-size="7.5" font-weight="500">上下文 / 追踪</text>
+          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="上下文 / 追踪" data-legend-x="267" data-legend-baseline="454" data-legend-width="100">
+            <rect x="267" y="446" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
+            <text x="289" y="454" class="t-muted" font-size="7.5" font-weight="500">上下文 / 追踪</text>
           </g>
-          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="外部系统" data-legend-x="374" data-legend-baseline="462" data-legend-width="78">
-            <rect x="374" y="454" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
-            <text x="396" y="462" class="t-muted" font-size="7.5" font-weight="500">外部系统</text>
+          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="外部系统" data-legend-x="374" data-legend-baseline="454" data-legend-width="78">
+            <rect x="374" y="446" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
+            <text x="396" y="454" class="t-muted" font-size="7.5" font-weight="500">外部系统</text>
           </g>
         </g>
       </svg>
@@ -5593,8 +5592,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>统一后端控流程</h3>
         </div>
         <ul>
-          <li>&bull; Agent 只交任务类型和 ContextPack，不直接调模型或改库</li>
-          <li>&bull; Harness 负责路由、重试、Contract 校验和 harness_calls</li>
+          <li>&bull; 后端转交规划卡、正文、三份审查意见与记忆提案；Agent 不互调</li>
+          <li>&bull; Harness 独立调用模型、校验结果并记录每次调用</li>
         </ul>
       </div>
 
@@ -5604,8 +5603,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>关卡先于三审</h3>
         </div>
         <ul>
-          <li>&bull; 字数失败只回 Writing；内容失败计数，第三次回 Planning</li>
-          <li>&bull; 场景事实可自动写，叙事事件和世界规则必须人审</li>
+          <li>&bull; 字数失败只回生文；内容失败返工，严重或跨场冲突请裁决 Agent</li>
+          <li>&bull; 场景事实可自动写；叙事事件、世界规则、人物细节需人审</li>
         </ul>
       </div>
     </div>
