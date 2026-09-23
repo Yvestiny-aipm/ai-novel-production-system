@@ -1,0 +1,84 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "长篇生产主链路",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "docs/archify/scene-production-workflow.html"
+  },
+  "lanes": [
+    { "id": "desk", "label": "作品资料" },
+    { "id": "run", "label": "场次生产" },
+    { "id": "gate", "label": "关卡与人审", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "plan", "label": "规划", "fromCol": 0, "toCol": 1 },
+    { "id": "draft", "label": "生文过关", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "commit", "label": "审查入库", "fromCol": 4, "toCol": 5 }
+  ],
+  "groups": [
+    { "id": "gate_band", "label": "确定性关卡在三审前", "lane": "gate", "fromCol": 2, "toCol": 3, "variant": "security" }
+  ],
+  "mainPath": [
+    "brief",
+    "pack",
+    "planning",
+    "writing",
+    "gates",
+    "reviews",
+    "memory",
+    "confirm",
+    "next"
+  ],
+  "semanticChecks": {
+    "allowedRoots": ["brief"],
+    "allowedTerminals": ["next", "blocked"],
+    "requiredPaths": [{ "from": "brief", "to": "next" }]
+  },
+  "nodes": [
+    { "id": "brief", "lane": "desk", "col": 0, "type": "external", "label": "CreativeBrief", "sublabel": "确认后只读" },
+    { "id": "pack", "lane": "desk", "col": 1, "type": "database", "label": "ContextPack", "sublabel": "当场只读快照" },
+    { "id": "planning", "lane": "run", "col": 1, "type": "backend", "label": "规划 Agent", "sublabel": "ScenePlan" },
+    { "id": "writing", "lane": "run", "col": 2, "type": "backend", "label": "生文 Agent", "sublabel": "ProseDraft" },
+    { "id": "gates", "lane": "gate", "col": 2, "type": "security", "label": "确定性关卡", "sublabel": "字数重复 Canon", "tag": "代码拦截" },
+    { "id": "reviews", "lane": "run", "col": 3, "type": "backend", "label": "三审", "sublabel": "世界 / 剧情 / 语言" },
+    { "id": "memory", "lane": "run", "col": 4, "type": "backend", "label": "记忆 Agent", "sublabel": "MemoryProposal" },
+    { "id": "confirm", "lane": "gate", "col": 4, "type": "security", "label": "人工确认", "sublabel": "正式设定不自动写" },
+    { "id": "next", "lane": "desk", "col": 5, "type": "database", "label": "下场读取", "sublabel": "账本 + 此刻状态" },
+    { "id": "rework", "lane": "gate", "col": 1, "type": "messagebus", "label": "返工", "sublabel": "回 Writing 或 Planning" },
+    { "id": "blocked", "lane": "gate", "col": 5, "type": "security", "label": "阻断", "sublabel": "次数用尽或技术异常" }
+  ],
+  "edges": [
+    { "id": "brief-pack", "from": "brief", "to": "pack", "label": "注入作品规则" },
+    { "id": "pack-plan", "from": "pack", "to": "planning", "label": "组装规划包" },
+    { "id": "plan-write", "from": "planning", "to": "writing", "label": "规划通过", "variant": "emphasis" },
+    { "id": "write-gates", "from": "writing", "to": "gates", "label": "交正文" },
+    { "id": "gates-reviews", "from": "gates", "to": "reviews", "label": "关卡通过", "variant": "emphasis" },
+    { "id": "reviews-memory", "from": "reviews", "to": "memory", "label": "QualityReport" },
+    { "id": "memory-confirm", "from": "memory", "to": "confirm", "label": "提案" },
+    { "id": "confirm-next", "from": "confirm", "to": "next", "label": "本场 completed", "variant": "emphasis" },
+    { "id": "next-pack", "from": "next", "to": "pack", "label": "下场 ContextPack", "variant": "dashed", "role": "return" },
+    { "id": "gates-rework", "from": "gates", "to": "rework", "label": "关卡或审查失败", "variant": "security", "role": "error" },
+    { "id": "rework-write", "from": "rework", "to": "writing", "label": "重写", "variant": "dashed", "role": "return", "route": "drop" },
+    { "id": "rework-blocked", "from": "rework", "to": "blocked", "label": "次数用尽", "variant": "security", "role": "error" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "统一后端控流程",
+      "items": [
+        "Agent 只交任务类型和 ContextPack，不直接调模型或改库",
+        "Harness 负责路由、重试、Contract 校验和 harness_calls"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "关卡先于三审",
+      "items": [
+        "字数失败只回 Writing；内容失败计数，第三次回 Planning",
+        "场景事实可自动写，叙事事件和世界规则必须人审"
+      ]
+    }
+  ]
+}
