@@ -3,7 +3,8 @@ import os
 from backend.azure_foundry import (
     AzureFoundryAdapter, DEFAULT_FOUNDRY_DEPLOYMENT,
     build_foundry_kwargs, extract_text_content, finish_reason_from_stop,
-    normalize_foundry_base_url, resolve_foundry_auth, split_system_and_messages,
+    normalize_foundry_base_url, resolve_foundry_auth, resolve_foundry_thinking,
+    split_system_and_messages,
 )
 
 EXAMPLE_FOUNDRY_ENDPOINT = "https://example-resource.services.ai.azure.com/anthropic"
@@ -78,6 +79,14 @@ assert kwargs["max_tokens"] == 2048
 assert "temperature" not in kwargs
 assert kwargs["thinking"] == {"type": "disabled"}
 assert kwargs["output_config"] == {"effort": "low"}
+assert resolve_foundry_thinking("claude-opus-5") == {"type": "disabled"}
+assert resolve_foundry_thinking("claude-opus-5-5-ay-cuizhiyuan") == {"type": "adaptive"}
+assert build_foundry_kwargs(
+    {**request, "model": "claude-opus-5-5"}, default_model="unused"
+)["thinking"] == {"type": "adaptive"}
+assert resolve_foundry_thinking("claude-opus-5-5", {"AZURE_FOUNDRY_THINKING": "disabled"}) == {
+    "type": "disabled"
+}
 assert kwargs["system"]
 assert kwargs["messages"][0]["role"] == "user"
 assert "api_key" not in kwargs

@@ -8,6 +8,8 @@ import uuid
 from backend.context_pack import ContextPackService
 from backend.content_similarity import check_draft_repetition, check_plan_repetition
 from backend.character_canon import CHARACTER_CANON_REASON, validate_character_canon
+from backend.established_facts import (ESTABLISHED_FACTS_REASON, WORLD_STATE_REASON,
+    load_established_facts, present_scene_state, validate_established_facts, validate_world_state)
 from backend.setting_canon import SETTING_CANON_REASON, validate_setting_canon
 from backend.progression import (PROGRESSION_RESULT_KEYS, apply_to_quality, plan_before_state_conflict_items,
     progression_baseline_from_state, verify_progression)
@@ -1032,12 +1034,13 @@ class SceneRecovery:
         if self.number > 1:
             prior = one(self.db,'select q.*,p.story_state_version from quality_reports q join prose_drafts d on d.draft_id=q.draft_id join scene_plans p on p.scene_id=d.scene_id and p.plan_version=d.plan_version where q.scene_id=? and q.status=? order by d.draft_version desc limit 1', (f'{self.book}_scene_{self.number-1}','passed'))
             if not prior: raise ValueError('PREVIOUS_CONFIRMED_STATE_MISSING')
-            previous = json.loads(prior['accepted_scene_state_json'])
+            previous = present_scene_state(json.loads(prior['accepted_scene_state_json']))
             story_version = prior['story_state_version']+1
         else: story_version = 1
         sources = [{'source_id':'brief_real_v1','source_type':'brief','book_id':self.book,'version':1,'content':'潮痕档案：林照调查林澜失踪与灯塔档案；灯塔只能保存和展示记忆。'}]
         if previous: sources.append({'source_id':f'accepted_scene_{self.number-1}','source_type':'scene_memory','book_id':self.book,'version':story_version-1,'content':previous})
-        cp = ContextPackService(self.db).assemble(pack_id=f'{self.scene}_pack_v{cv}',book_id=self.book,chapter_id=self.chapter,scene_id=self.scene,version=cv,target_agent='planning',target_node='planning',brief_version=1,plan_version=pv,story_state_version=story_version,canon_version=1,sources=sources,previous_scene_state=previous)
+        ledger = load_established_facts(self.db, book_id=self.book, before_scene_number=self.number)
+        cp = ContextPackService(self.db).assemble(pack_id=f'{self.scene}_pack_v{cv}',book_id=self.book,chapter_id=self.chapter,scene_id=self.scene,version=cv,target_agent='planning',target_node='planning',brief_version=1,plan_version=pv,story_state_version=story_version,canon_version=1,sources=sources,previous_scene_state=previous,established_facts=ledger,chapter_summary=ledger.get('chapter_summary') or '')
         planning_input={'scene_number':self.number,'context_pack':cp}
         if self.number > 1:
             planning_input['progression_baseline']=progression_baseline_from_state(previous)
@@ -1150,6 +1153,20 @@ class SceneRecovery:
                             setting_canon_failure_reason=SETTING_CANON_REASON,
                             setting_canon_conflicts=setting.get('conflicts') or [])
             return self._route_content_failure(SETTING_CANON_REASON, draft_id=self.out['draft_id'])
+        facts = validate_established_facts(writing['payload']['text'], cp.get('established_facts'))
+        self.out['established_facts_status'] = facts['status']
+        if facts['status'] == 'failed':
+            self.out.update(passed_review=False, rework=True,
+                            established_facts_failure_reason=ESTABLISHED_FACTS_REASON,
+                            established_facts_conflicts=facts.get('conflicts') or [])
+            return self._route_content_failure(ESTABLISHED_FACTS_REASON, draft_id=self.out['draft_id'])
+        world = validate_world_state(writing['payload']['text'], cp.get('world_state'))
+        self.out['world_state_status'] = world['status']
+        if world['status'] == 'failed':
+            self.out.update(passed_review=False, rework=True,
+                            world_state_failure_reason=WORLD_STATE_REASON,
+                            world_state_conflicts=world.get('conflicts') or [])
+            return self._route_content_failure(WORLD_STATE_REASON, draft_id=self.out['draft_id'])
         self.node = 'reviewing'
         report = one(self.db,'select * from quality_reports where draft_id=? order by review_attempt desc limit 1',(self.out['draft_id'],))
         if report:

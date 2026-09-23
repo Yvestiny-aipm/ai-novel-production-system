@@ -14,6 +14,14 @@ from backend.deepseek import (
     DeepSeekOfficialAdapter,
     resolve_deepseek_model,
 )
+from backend.openai_official import (
+    DEFAULT_OPENAI_MAX_OUTPUT_TOKENS,
+    OPENAI_API_KEY_ENV,
+    OPENAI_MAX_OUTPUT_ENV,
+    PROVIDER_OPENAI,
+    OpenAIOfficialAdapter,
+    resolve_openai_model,
+)
 from backend.harness import ModelProfile
 from backend.siliconflow import (
     DEFAULT_SILICONFLOW_MODEL,
@@ -34,6 +42,9 @@ PROVIDER_ALIASES = {
     "siliconflow": PROVIDER_SILICONFLOW,
     "deepseek": PROVIDER_DEEPSEEK,
     "deepseek_official": PROVIDER_DEEPSEEK,
+    "openai": PROVIDER_OPENAI,
+    "openai_official": PROVIDER_OPENAI,
+    "gpt": PROVIDER_OPENAI,
 }
 TASK_PROVIDER_ENV = {
     "writing": "WRITING_PROVIDER",
@@ -83,6 +94,8 @@ def resolve_routed_model(task_type, environ=None, *, default=None, provider=None
         return resolve_foundry_model(task_type, env, default=default)
     if chosen == PROVIDER_DEEPSEEK:
         return resolve_deepseek_model(task_type, env, default=default)
+    if chosen == PROVIDER_OPENAI:
+        return resolve_openai_model(task_type, env, default=default)
     return resolve_task_model(task_type, env, default=default or DEFAULT_SILICONFLOW_MODEL)
 
 
@@ -93,6 +106,11 @@ def resolve_max_output_tokens(provider, environ=None):
         if configured:
             return int(configured)
         return FOUNDRY_MAX_OUTPUT_TOKENS
+    if provider == PROVIDER_OPENAI:
+        configured = _env_text(env, OPENAI_MAX_OUTPUT_ENV)
+        if configured:
+            return int(configured)
+        return DEFAULT_OPENAI_MAX_OUTPUT_TOKENS
     return DEFAULT_MAX_OUTPUT_TOKENS
 
 
@@ -103,6 +121,8 @@ def create_adapter(provider, *, siliconflow_adapter=None, environ=None):
         return AzureFoundryAdapter(environ=environ)
     if provider == PROVIDER_DEEPSEEK:
         return DeepSeekOfficialAdapter(environ=environ)
+    if provider == PROVIDER_OPENAI:
+        return OpenAIOfficialAdapter(environ=environ)
     raise ValueError(f"UNKNOWN_PROVIDER:{provider}")
 
 
@@ -115,6 +135,8 @@ def missing_runtime_credentials(environ=None, *, task_types=None):
         missing.append("SILICONFLOW_API_KEY")
     if PROVIDER_DEEPSEEK in providers and not _env_text(env, "DEEPSEEK_API_KEY"):
         missing.append("DEEPSEEK_API_KEY")
+    if PROVIDER_OPENAI in providers and not _env_text(env, OPENAI_API_KEY_ENV):
+        missing.append(OPENAI_API_KEY_ENV)
     if PROVIDER_FOUNDRY in providers:
         if not _env_text(env, FOUNDRY_ENDPOINT_ENV):
             missing.append("AZURE_FOUNDRY_CLAUDE_ENDPOINT")

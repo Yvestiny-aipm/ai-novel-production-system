@@ -13,9 +13,12 @@ from integration.run_real_test import run, save_draft, save_plan
 from integration.seed_real_test import seed
 
 
-# Real 20_k sentences, copied out. Tests never open data/real_test_20_k.db.
+# Real 20_k / 40_a sentences, copied out. Tests never open historical DBs.
 SCENE14_TA = "林照把油布包放在桌上，没有坐下。他扫了一圈，目光落在桌角那摞册子上。"
 SCENE18_SISTER = "“守灯的。”他重复了一遍，语气没有变化，“塔上的人都这么叫。你姐姐也这么叫。”"
+SCENE40A_HANDOFF = "要铜牌。林照把铜牌递过去，他只看编号那一行，指腹压住"
+SCENE40A_WATCHMAN = "林照站起来，膝盖有些僵。她看着守夜人把晶片放回带编号的浅格。浅格在墙侧一排小抽屉里，他拉开其中一格"
+SCENE40B_ENTER = "着门口。林照进来时，他正用一块软布擦光面边缘，"
 SCENE10_SHE = "林照的鞋底陷进湿沙半寸，她停住，没有继续往岸上走。"
 SCENE5_MEIMEI = "林照的手停在结上。红线下方的双结是妹妹林澜留下的，左手使力，收尾偏左。"
 SCENE14_CHEN = "林照把油布包按在胸口，涉水往回走。老陈在前面带路，步子比来时快，水没过膝盖时他回头看了一眼，确认林照没停。"
@@ -51,6 +54,38 @@ expect("一个老人正弯着腰。他听见脚步声。", ok=True)
 expect("林照看见一个老人正弯着腰。他听见脚步声。", ok=True)
 expect("“门自己关上？”林照问。\n\n“风。”他说，但说得很轻", ok=True)
 expect("“门自己关上？”林照问。\n\n“风。”他说，但说得很轻，像自己也不信。他把麻袋甩上肩", ok=True)
+expect(SCENE40A_HANDOFF, ok=True)
+expect(SCENE40A_WATCHMAN, ok=True)
+expect("林照把名册交给对方，他只核对编号。", ok=True)
+expect("林照把匣子递上，他双手接住。", ok=True)
+expect(SCENE40B_ENTER, ok=True)
+expect("林照进门时，他已经站在调取台前", ok=True)
+expect("当着林照的面，在册上写下执行结论。他写一行", ok=True)
+expect("他提灯送林照下塔，一路无话。到了塔底，他从衣袋里取出", ok=True)
+expect("林照盯着那行字，等他往下念。他没有停", ok=True)
+expect("林照问下一轮是否仍带小本子上塔，他答照旧", ok=True)
+expect("周守礼。林照没有再翻原册。她在本子上把要问的事按顺序编好号：条目是谁写的，什么时候写的，起始时刻从哪里来，他亲眼看见了什么。", ok=True)
+expect("林照问他当夜有没有走进便道查看，他答得很干脆：“没有。", ok=True)
+expect("林照又让他看上下相邻两条，他认出上一条也是自己写的", ok=True)
+expect("林照把他的回答复述了一遍：条目是他当晚所写；他亲眼看见入口处已有一段围", ok=True)
+expect("林照改正，请他在口述栏旁签名。他签了", ok=True)
+expect("林照看见周守礼在岗上。她问完，他点头", ok=True)
+expect("林照找到梁敏。他没有抬头", ok=True)
+expect("林照高高兴兴地坐下。他扫了一圈", ok=False)
+expect("林照想起林澜还在镇上。他扫了一圈", ok=False)
+
+su_wan = {
+    "canon_version": 1,
+    "rule": CHARACTER_CANON_RULE,
+    "characters": [{"name": "苏晚", "gender": "female", "pronoun": "她"}],
+    "male_others": ["老人", "男人", "老头"],
+}
+assert validate_character_canon("苏晚把包放在桌上，没有坐下。他扫了一圈", su_wan)["status"] == "failed"
+assert validate_character_canon("当着苏晚的面，在册上写下结论。他写一行", su_wan)["status"] == "passed"
+assert validate_character_canon("送苏晚到门口，他转身关门", su_wan)["status"] == "passed"
+su_instruction = character_canon_instruction(su_wan)
+assert "苏晚是女性，代词用她，不得用他承接苏晚" in su_instruction
+assert "林照" not in su_instruction
 
 canon = character_canon_snapshot()
 assert canon["canon_version"] == 1
@@ -59,7 +94,9 @@ names = {item["name"]: item for item in canon["characters"]}
 assert names["林照"]["gender"] == "female" and names["林照"]["pronoun"] == "她"
 assert names["林照"]["kinship"]["林澜"] == "妹妹"
 assert names["林澜"]["relation"] == "林照的妹妹"
-assert "老陈" not in names and "守灯的" not in names
+assert "老陈" not in names and "守灯的" not in names and "守夜人" not in names
+assert canon["male_others"] == ["老陈", "守灯的", "守夜人", "老人", "男人", "老头"]
+assert "守夜人" in canon["male_others"]
 
 for instruction in (
     character_canon_instruction(),
@@ -70,6 +107,9 @@ for instruction in (
     assert "character_canon" in instruction
     assert "禁止写反" in instruction
     assert "妹妹" in instruction
+    assert "守夜人是男性，他不指林照" in instruction
+    assert "换指前先写出被指的人" in instruction
+    assert "容易混时用名字" in instruction
 
 
 with tempfile.TemporaryDirectory() as directory:

@@ -2,6 +2,8 @@
 from __future__ import annotations
 import copy, json, time, uuid
 
+from backend.established_facts import present_scene_state
+
 ALGORITHM_VERSION = "progression_evidence_v3"
 PROGRESS_TYPES = {"new_clue","character_state_change","relationship_change","conflict_change","decision_or_consequence","thread_opened","thread_advanced","thread_closed","goal_milestone"}
 UNKNOWN = {"未知", "unknown", "尚未知", "不明"}
@@ -97,11 +99,10 @@ def progression_baseline_from_state(state):
         "characters": [], "events": [], "relationship_changes": [], "unresolved_threads": [],
         "location": "", "time_context": "",
     }
-    if not isinstance(state, dict):
-        return empty
+    cleaned = present_scene_state(state)
     baseline = {}
     for field in PROGRESSION_BASELINE_FIELDS:
-        baseline[field] = copy.deepcopy(state[field]) if field in state else empty[field]
+        baseline[field] = copy.deepcopy(cleaned[field]) if field in cleaned else empty[field]
     return baseline
 
 

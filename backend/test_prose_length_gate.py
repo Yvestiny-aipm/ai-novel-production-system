@@ -5,10 +5,10 @@ import tempfile
 from pathlib import Path
 
 from backend.harness import PLANNING_PROMPT_VERSION
-from backend.prose_length import (DEFAULT_TARGET_WORD_COUNT, MAX_CHARACTER_COUNT,
-    MIN_CHARACTER_COUNT, PREFERRED_SOFT_MAX, PREFERRED_SOFT_MIN, WRITING_PROMPT_VERSION,
-    actual_character_count, length_revision_feedback, planning_length_rework_feedback,
-    validate_prose_length)
+from backend.prose_length import (DEFAULT_TARGET_WORD_COUNT, GATE_MIN_CHARACTER_COUNT,
+    MAX_CHARACTER_COUNT, MIN_CHARACTER_COUNT, PREFERRED_SOFT_MAX, PREFERRED_SOFT_MIN,
+    WRITING_PROMPT_VERSION, actual_character_count, length_revision_feedback,
+    planning_length_rework_feedback, validate_prose_length)
 from backend.siliconflow import (build_chat_messages, first_draft_writing_instruction,
     writing_length_edit_instruction, writing_quality_edit_instruction)
 from integration.run_real_test import run, save_draft
@@ -23,9 +23,14 @@ def prose(size, reported=1250):
 
 
 # Whitespace never counts; all remaining visible characters do.
+assert GATE_MIN_CHARACTER_COUNT == 800
+assert MIN_CHARACTER_COUNT == 1000
+assert MAX_CHARACTER_COUNT == 2300
+assert WRITING_PROMPT_VERSION == "prose_quality_v8"
 assert actual_character_count(" 潮\n痕\t") == 2
 for size, status, reason in ((0, "failed", "empty_text"), (346, "failed", "under_length"),
-                             (999, "failed", "under_length"), (1000, "passed", None),
+                             (799, "failed", "under_length"), (800, "passed", None),
+                             (999, "passed", None), (1000, "passed", None),
                              (1250, "passed", None), (1500, "passed", None),
                              (1501, "passed", None), (2300, "passed", None),
                              (2301, "failed", "over_length")):
@@ -44,7 +49,8 @@ def failed_draft(draft_id, size, reason, attempt=1):
 expand = length_revision_feedback(failed_draft("s_draft_v1", 682, "under_length"))
 assert expand["adjustment_direction"] == "expand"
 assert expand["character_delta_to_target"] == 1250 - 682
-assert expand["required_minimum_character_delta"] == 1000 - 682
+assert expand["minimum_character_count"] == MIN_CHARACTER_COUNT
+assert expand["required_minimum_character_delta"] == MIN_CHARACTER_COUNT - 682
 assert expand["required_maximum_character_delta"] == MAX_CHARACTER_COUNT - 682
 assert expand["preferred_character_delta"] == 1250 - 682
 assert expand["preferred_output_minimum"] == PREFERRED_SOFT_MIN
@@ -83,6 +89,7 @@ assert "contract_type" in first_messages[0]["content"] and "ProseDraft" in first
 assert "revision_feedback" not in first_messages[1]["content"]
 assert first_messages[2]["content"] == first_draft_writing_instruction()
 assert "1000～2300" in first_messages[2]["content"] and "1200～1350" in first_messages[2]["content"]
+assert "800～2300" not in first_messages[2]["content"]
 assert "不能只改word_count" in first_messages[2]["content"]
 assert "超过2300不合格" in first_messages[2]["content"]
 assert "必须压到硬上限以下" in first_messages[2]["content"]
@@ -127,6 +134,7 @@ assert "写得更具体" not in over_messages[2]["content"]
 assert "整篇不动" not in over_messages[2]["content"]
 for instruction in (under_messages[2]["content"], over_messages[2]["content"]):
     assert "1000～2300" in instruction and "1200～1350" in instruction
+    assert "800～2300" not in instruction
     assert "后端实算" in instruction
     assert "不是官方计数" in instruction
     assert "1287" not in instruction
@@ -218,7 +226,7 @@ class LengthSequenceAdapter:
     """Four length drafts stay on the same plan; Planning is not involved."""
     def __init__(self):
         self.calls = []
-        self.writing_sizes = [346, 999, 2301, 1000]
+        self.writing_sizes = [346, 799, 2301, 1000]
 
     def complete(self, request, timeout_seconds):
         self.calls.append(request)
@@ -247,7 +255,7 @@ with tempfile.TemporaryDirectory() as directory:
     # First three failed lengths stay on Plan v1. The fourth draft (1000)
     # enters review; Planning is never asked to fix model length.
     rows = db.execute("select draft_version,plan_version,content_attempt_in_plan,content_attempt_total,word_count,length_validation_status,length_validation_reason from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall()
-    assert rows == [(1, 1, 1, 1, 346, "failed", "under_length"), (2, 1, 2, 2, 999, "failed", "under_length"), (3, 1, 3, 3, 2301, "failed", "over_length"), (4, 1, 4, 4, 1000, "passed", None)]
+    assert rows == [(1, 1, 1, 1, 346, "failed", "under_length"), (2, 1, 2, 2, 799, "failed", "under_length"), (3, 1, 3, 3, 2301, "failed", "over_length"), (4, 1, 4, 4, 1000, "passed", None)]
     assert db.execute("select plan_attempt,content_attempt_in_plan,content_attempt_total from task_states where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone() == (1, 0, 0)
     assert db.execute("select count(*) from quality_reports where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone()[0] == 1
     assert db.execute("select draft_id from quality_reports where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone()[0].endswith("draft_v4")
@@ -374,14 +382,14 @@ class Gates17LengthAdapter(LengthSequenceAdapter):
 
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "gates17-fourth-allowed.db"
-    adapter = Gates17LengthAdapter([2418, 982, 2338, 1250])
+    adapter = Gates17LengthAdapter([2418, 799, 2338, 1250])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential")
     db = sqlite3.connect(path)
     assert [call["task_type"] for call in adapter.calls].count("planning") == 1
     assert [call["task_type"] for call in adapter.calls].count("writing") == 4
     assert result["scenes"][0]["final_status"] == "waiting_confirmation"
     assert db.execute("select draft_version,plan_version,actual_character_count,length_validation_reason from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall() == [
-        (1, 1, 2418, "over_length"), (2, 1, 982, "under_length"), (3, 1, 2338, "over_length"), (4, 1, 1250, None),
+        (1, 1, 2418, "over_length"), (2, 1, 799, "under_length"), (3, 1, 2338, "over_length"), (4, 1, 1250, None),
     ]
     assert db.execute("select plan_attempt,content_attempt_in_plan,content_attempt_total,status from task_states where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone() == (1, 0, 0, "waiting_confirmation")
     db.close()
@@ -389,13 +397,13 @@ with tempfile.TemporaryDirectory() as directory:
 
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "gates17-fourth-blocks.db"
-    adapter = Gates17LengthAdapter([2418, 982, 2338, 2411])
+    adapter = Gates17LengthAdapter([2418, 799, 2338, 2411])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential")
     db = sqlite3.connect(path)
     assert [call["task_type"] for call in adapter.calls].count("planning") == 1
     assert result["scenes"][0]["final_status"] == "blocked"
     assert result["scenes"][0]["block_reason"] == "length_attempts_exhausted"
-    assert db.execute("select actual_character_count from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall() == [(2418,), (982,), (2338,), (2411,)]
+    assert db.execute("select actual_character_count from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchall() == [(2418,), (799,), (2338,), (2411,)]
     assert db.execute("select coalesce(max(plan_version),0) from scene_plans where scene_id=?", ("realtest_tide_archive_scene_1",)).fetchone()[0] == 1
     db.close()
 

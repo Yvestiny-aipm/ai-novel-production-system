@@ -2,6 +2,9 @@
 import hashlib, json, os, re, urllib.request
 
 from backend.character_canon import character_canon_instruction
+from backend.established_facts import established_facts_instruction, world_state_instruction
+from backend.chapter_state import chapter_state_instruction
+from backend.pacing import pacing_state_instruction
 from backend.setting_canon import setting_canon_instruction
 from backend.prose_length import (DEFAULT_TARGET_WORD_COUNT, MAX_CHARACTER_COUNT, MIN_CHARACTER_COUNT,
     PREFERRED_SOFT_MAX, PREFERRED_SOFT_MIN, actual_character_count)
@@ -11,6 +14,7 @@ PARSE_SUFFIX_LIMIT = 200
 TRIM_SINGLE_REDUNDANT_BRACE_RULE = "trim_single_redundant_closing_brace_v1"
 PLAIN_PROSE_WRAP_RULE = "wrap_plain_prose_as_prose_draft_v1"
 ESCAPE_UNESCAPED_QUOTES_IN_REVIEWER_STRINGS_RULE = "escape_unescaped_quotes_in_reviewer_strings_v1"
+INSERT_MISSING_COMMA_IN_REVIEWER_RESULT_RULE = "insert_missing_comma_in_reviewer_result_v1"
 MIN_PLAIN_PROSE_WRAP_CHARS = 50
 FENCED_JSON = re.compile(r"```(?:json)?\s*([\s\S]*?)```", re.IGNORECASE)
 
@@ -74,6 +78,45 @@ def _extra_data_error(error):
 def _unterminated_string_error(error):
     message = getattr(error, "msg", "") or str(error)
     return "Unterminated string" in message or "Unterminated" in message
+
+
+def _missing_comma_error(error):
+    message = getattr(error, "msg", "") or str(error)
+    return "Expecting ',' delimiter" in message
+
+
+def _loads_object_no_trailing(text):
+    try:
+        value, end = json.JSONDecoder().raw_decode(text)
+    except json.JSONDecodeError:
+        return None
+    if text[end:].strip() or not isinstance(value, dict):
+        return None
+    return value
+
+
+def _insert_missing_comma_in_reviewer_result(text, error, *, original_text=None):
+    """Insert one comma at the reported delimiter gap. ReviewerResult only."""
+    if not _missing_comma_error(error):
+        return None
+    pos = getattr(error, "pos", None)
+    if not isinstance(pos, int) or pos < 0 or pos > len(text):
+        return None
+    if pos > 0 and text[pos - 1] == ",":
+        return None
+    candidate = text[:pos] + "," + text[pos:]
+    value = _loads_object_no_trailing(candidate)
+    if value is None:
+        return None
+    source = original_text if original_text is not None else text
+    if "contract_parse_normalization_audit" not in value:
+        value = dict(value)
+        value["contract_parse_normalization_audit"] = {
+            "rule": INSERT_MISSING_COMMA_IN_REVIEWER_RESULT_RULE,
+            "original_content_length": len(source),
+            "original_content_hash": hashlib.sha256(source.encode()).hexdigest(),
+        }
+    return value
 
 
 def _trim_single_redundant_closing_brace(text, *, finish_reason=None):
@@ -226,7 +269,24 @@ def parse_contract_content(content, *, finish_reason=None, usage=None, expected=
             and finish_reason != "length"
             and not _unterminated_string_error(exc)
         ):
-            normalized = _escape_unescaped_quotes_in_reviewer_result(text)
+            normalized = None
+            if _missing_comma_error(exc):
+                normalized = _insert_missing_comma_in_reviewer_result(text, exc)
+            if normalized is None:
+                normalized = _escape_unescaped_quotes_in_reviewer_result(text)
+            if normalized is None:
+                quoted = _escape_bare_ascii_quotes_in_json_strings(text)
+                if quoted:
+                    try:
+                        json.JSONDecoder().raw_decode(quoted)
+                    except json.JSONDecodeError as quote_exc:
+                        if (
+                            _missing_comma_error(quote_exc)
+                            and not _unterminated_string_error(quote_exc)
+                        ):
+                            normalized = _insert_missing_comma_in_reviewer_result(
+                                quoted, quote_exc, original_text=text,
+                            )
             if normalized is not None:
                 return normalized
         code = "MODEL_OUTPUT_TRUNCATED" if finish_reason == "length" else "MODEL_RESPONSE_JSON_INVALID"
@@ -570,6 +630,10 @@ def planning_progression_instruction():
         "不能因为这些字段已出现在 entrance_state 或 exit_state 中就省略顶层字段。"
         + character_canon_instruction()
         + setting_canon_instruction()
+        + established_facts_instruction()
+        + world_state_instruction()
+        + pacing_state_instruction()
+        + chapter_state_instruction()
     )
 
 
@@ -596,6 +660,8 @@ def first_draft_writing_instruction():
         "必须遵守 scene_plan.must_not_happen、knowledge_boundary 和已批准世界规则。"
         + character_canon_instruction()
         + setting_canon_instruction()
+        + established_facts_instruction()
+        + world_state_instruction()
         + f"超过{MAX_CHARACTER_COUNT}不合格。必须压到硬上限以下。不能只改word_count。"
         "正式长度以后端非空白实算为准。payload.word_count 不是官方计数。"
         "不能只把 word_count 改成 1287/1250 来充合格。"

@@ -70,7 +70,7 @@ PYTHONPATH=. python acceptance/run_cases.py
 
 ## 环境变量与真实模型测试
 
-密钥只从环境变量读取。未设置 `WRITING_PROVIDER` 时默认仍走硅基流动。二十场脚本默认生文走 DeepSeek 官网 `deepseek-flash`，规划/审查仍可切到 Azure Foundry。以下值是占位符：
+密钥只从环境变量读取。未设置 `WRITING_PROVIDER` 时默认仍走硅基流动。二十场脚本默认生文走 DeepSeek 官网 `deepseek-flash`，规划/审查仍可切到 Azure Foundry 或 OpenAI。以下值是占位符：
 
 ```sh
 export RUN_REAL_MODEL=1
@@ -84,6 +84,12 @@ export AZURE_FOUNDRY_CLAUDE_ENDPOINT="https://<your-foundry-resource>.services.a
 export AZURE_FOUNDRY_CLAUDE_DEPLOYMENT="<your-foundry-deployment>"
 export AZURE_FOUNDRY_CLAUDE_API_KEY="<your-foundry-api-key>"
 # 若用 Entra 而不用 Key：export AZURE_FOUNDRY_AUTH=entra
+# 可选：规划 / 三审 / 裁决走 OpenAI GPT-6 Sol
+# export PLANNING_PROVIDER=openai
+# export REVIEW_PROVIDER=openai
+# export ARBITER_PROVIDER=openai
+# export OPENAI_API_KEY="<your-openai-api-key>"
+# export OPENAI_DEFAULT_MODEL=gpt-6-sol
 python3 integration/run_real_test.py
 ```
 
@@ -136,6 +142,8 @@ PYTHONPATH=. python3 integration/manage_backup.py restore \
 
 ## 方案文档
 
+- [系统架构 README（本项目）](docs/系统架构README-本项目.md)
+- [系统架构 README（竞品对照）](docs/系统架构README-竞品.md)
 - [方案基线 V1](docs/方案基线-v1.md)
 - [开发交接说明 V1](docs/开发交接说明-v1.md)
 - [Contract 说明](contracts/README.md)

@@ -6,6 +6,8 @@ orchestrator uses this module's count for every workflow decision.
 from __future__ import annotations
 
 MIN_CHARACTER_COUNT = 1000
+# Acceptance floor only. Prompts and expand deltas keep MIN_CHARACTER_COUNT.
+GATE_MIN_CHARACTER_COUNT = 800
 MAX_CHARACTER_COUNT = 2300
 MAX_LENGTH_FAILURES_IN_PLAN = 4
 LENGTH_FAILURE_REASONS = frozenset({"empty_text", "under_length", "over_length"})
@@ -28,7 +30,7 @@ def validate_prose_length(text: str | None, *, target_word_count: int = DEFAULT_
     target = target_word_count if isinstance(target_word_count, int) and target_word_count > 0 else DEFAULT_TARGET_WORD_COUNT
     if actual == 0:
         reason = "empty_text"
-    elif actual < MIN_CHARACTER_COUNT:
+    elif actual < GATE_MIN_CHARACTER_COUNT:
         reason = "under_length"
     elif actual > MAX_CHARACTER_COUNT:
         reason = "over_length"

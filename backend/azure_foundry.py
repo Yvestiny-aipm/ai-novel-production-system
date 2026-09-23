@@ -61,7 +61,7 @@ def foundry_credentials_configured(environ=None):
     env = environ if environ is not None else os.environ
     if resolve_foundry_auth(env) == "entra":
         return True
-    return bool(_env_text(env, FOUNDRY_API_KEY_ENV) or os.getenv(FOUNDRY_API_KEY_ENV))
+    return bool(_env_text(env, FOUNDRY_API_KEY_ENV))
 
 
 def resolve_foundry_model(task_type, environ=None, *, default=None):
@@ -99,15 +99,30 @@ def split_system_and_messages(chat_messages):
     return "\n\n".join(system_parts), messages
 
 
-def build_foundry_kwargs(request, default_model=None):
+def resolve_foundry_thinking(model=None, environ=None):
+    """Opus 5.5 rejects thinking.disabled; older Opus 5 needed it to keep JSON visible."""
+    env = environ if environ is not None else os.environ
+    explicit = (_env_text(env, "AZURE_FOUNDRY_THINKING") or "").lower()
+    if explicit in {"adaptive", "enabled"}:
+        return {"type": "adaptive"}
+    if explicit in {"disabled", "off"}:
+        return {"type": "disabled"}
+    name = (model or "").lower().replace("_", "-")
+    if "5-5" in name or "5.5" in name:
+        return {"type": "adaptive"}
+    return {"type": "disabled"}
+
+
+def build_foundry_kwargs(request, default_model=None, *, environ=None):
     system, messages = split_system_and_messages(build_chat_messages(request))
+    model = request.get("model") or default_model or DEFAULT_FOUNDRY_DEPLOYMENT
     kwargs = {
-        "model": request.get("model") or default_model or DEFAULT_FOUNDRY_DEPLOYMENT,
+        "model": model,
         "messages": messages,
         "max_tokens": request.get("max_output_tokens", 4096),
         # Opus 5 thinks by default and can spend the whole max_tokens budget
-        # on thinking blocks, leaving empty visible JSON.
-        "thinking": {"type": "disabled"},
+        # on thinking blocks, leaving empty visible JSON. 5.5 wants adaptive.
+        "thinking": resolve_foundry_thinking(model, environ),
         "output_config": {"effort": "low"},
     }
     if system:
@@ -272,7 +287,7 @@ class AzureFoundryAdapter:
 
     def complete(self, request, timeout_seconds):
         client = self._ensure_client(timeout_seconds)
-        kwargs = build_foundry_kwargs(request, default_model=self.model)
+        kwargs = build_foundry_kwargs(request, default_model=self.model, environ=self.environ)
         message = client.messages.create(**kwargs)
         if isinstance(message, dict) and message.get("contract"):
             return message["contract"]
