@@ -83,16 +83,47 @@ Agent 不直接互相发消息，也不能自行改数据库。**统一后端**�
 
 ## 本地查看与运行
 
-需要 Python 3.11+。把密钥放在本机 `.env` 或终端环境变量中；`.env` 不进入仓库。
+克隆仓库后，本机需要这些东西。密钥和已经跑完的小说库都不在仓库里。
+
+- **Python 3.11 或更高。** `./scripts/dev_up.sh` 会检查版本。不满足时直接退出。
+- **两个 Python 包。** `requirements.txt` 里是 `anthropic` 和 `azure-identity`。启动脚本会在仓库根目录创建 `.venv`，并用它安装这两个包。其余后端代码使用 Python 标准库。
+- **SQLite。** 使用 Python 自带的 SQLite。库文件写在 `data/`，不进入仓库。不需要单独安装数据库，也不需要 Node。
+- **本机网络。** 只打开工作台、或跑不调用模型的验收，不需要模型账号。要写出真实正文，本机必须能访问所选模型平台。
+
+在仓库根目录执行：
 
 ```sh
-cp -n .env.example .env
 ./scripts/dev_up.sh
 ```
 
-打开 `http://127.0.0.1:8124/` 查看工作台，或打开 `http://127.0.0.1:8124/admin.html` 查看管理页。`./scripts/dev_check.sh` 检查服务，`./scripts/dev_down.sh` 停止服务。页面当前主要支持查看任务状态，以及暂停、恢复、重新规划、重新生文和取消等操作。
+打开 `http://127.0.0.1:8124/` 查看工作台，或打开 `http://127.0.0.1:8124/admin.html` 查看管理页。`./scripts/dev_check.sh` 检查服务，`./scripts/dev_down.sh` 停止服务。页面当前主要支持查看任务状态，以及暂停、恢复、重新规划、重新生文和取消等操作。工作台默认使用 `data/local.db`，可用 `NOVEL_DB` 改路径，用 `DEV_HOST`、`DEV_PORT` 改地址，默认端口是 `8124`。
 
-真实模型规模测试使用独立的新数据库，并由 `integration/run_real_test.py` 启动；所需模型密钥和供应商路由见 [真实测试说明](integration/README.md)。未设置 `RUN_REAL_MODEL=1` 或缺少当前路由的密钥时，运行器返回 `not_run`。`REAL_TEST_AUTO_CONFIRM=1` 仅用于测试操作员代确认提案，不代表 Agent 可自行批准正式设定。
+### 真实正文需要的模型账号
+
+密钥只放在本机 `.env` 或当前终端的环境变量里。`.env` 不进入仓库。仓库里也没有示例密钥文件，需要自己新建 `.env`，只写变量名和自己的值。
+
+没有指定供应商时，代码默认走硅基流动，这时需要 `SILICONFLOW_API_KEY`。已经跑完的英文长篇没有用这个默认，而是显式分成两路：
+
+| 环节 | 环境变量 | 值 |
+|---|---|---|
+| 生文、记忆 | `WRITING_PROVIDER`、`MEMORY_PROVIDER` | `azure_foundry` |
+| 规划、三位审查、裁决 | `PLANNING_PROVIDER`、`REVIEW_PROVIDER`、`ARBITER_PROVIDER` | `openai` |
+
+Azure Foundry 这一路还需要：
+
+- `AZURE_FOUNDRY_CLAUDE_ENDPOINT`：自己的 Foundry 地址。
+- `AZURE_FOUNDRY_CLAUDE_API_KEY`，或者改用登录身份：`AZURE_FOUNDRY_AUTH=entra`。
+- 部署名可以不写。不写时用 `claude-opus-5`。要换部署，设置 `AZURE_FOUNDRY_CLAUDE_DEPLOYMENT`。
+
+OpenAI 这一路还需要：
+
+- `OPENAI_API_KEY`。
+- 地址可以不写。不写时用 `https://api.openai.com/v1/chat/completions`。要换地址，设置 `OPENAI_API_URL`。
+- 模型名可以不写。不写时用 `gpt-6-sol`。
+
+另一条可选路线是 DeepSeek：把对应环节的供应商设为 `deepseek`，并提供 `DEEPSEEK_API_KEY`。地址可用 `DEEPSEEK_API_URL` 覆盖。
+
+缺少当前路由所需的密钥时，适配器直接失败，不会编造正文。真实场次运行器是 `integration/run_real_test.py`。未设置 `RUN_REAL_MODEL=1`，或缺少当前路由的密钥时，它返回 `not_run`。场数用 `REAL_TEST_SCENE_COUNT`，数据库路径用 `REAL_TEST_DB`，应指向一个新的库文件，不要覆盖已完成的库。`EXECUTION_MODE` 不写时是 `sequential`。`REAL_TEST_AUTO_CONFIRM=1` 只表示测试操作员代确认提案，不代表 Agent 可以自行批准正式设定。
 
 ## 仓库地图
 
