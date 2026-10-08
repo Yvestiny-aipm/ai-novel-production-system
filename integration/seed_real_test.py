@@ -1,4 +1,4 @@
-"""创建阶段12独立测试数据库；重复执行安全。默认仍种 5 场，规模测试用 REAL_TEST_SCENE_COUNT。"""
+"""Create the stage-12 isolated test database. Safe to rerun. Default seed is 5 scenes; scale tests use REAL_TEST_SCENE_COUNT."""
 import os
 import sqlite3
 from pathlib import Path
@@ -7,7 +7,7 @@ FIXTURE = Path(__file__).parent / "real-test-fixture-v1.md"
 BOOK_ID = "realtest_tide_archive"
 DEFAULT_SCENE_COUNT = 5
 SCENES_PER_CHAPTER = 2
-CHAPTER_TITLES = {1: "公开潮汐"}
+CHAPTER_TITLES = {1: "Open Tide"}
 
 
 def resolve_scene_count(environ=None, default=DEFAULT_SCENE_COUNT):
@@ -53,7 +53,7 @@ def seed(db_path, scene_count=None):
     book = BOOK_ID
     db.execute(
         "INSERT OR IGNORE INTO books VALUES (?,?,?,?,?,?)",
-        (book, "潮痕档案", 1, 1, "2026", "2026"),
+        (book, "Tide-Mark Archive", 1, 1, "2026", "2026"),
     )
     db.execute(
         "INSERT OR IGNORE INTO creative_briefs VALUES (?,?,?,?,?,?,?)",
@@ -62,7 +62,7 @@ def seed(db_path, scene_count=None):
     chapter_count = chapter_number_for_scene(count, count)
     for chapter_number in range(1, chapter_count + 1):
         chapter_id = f"{book}_chapter_{chapter_number}"
-        title = CHAPTER_TITLES.get(chapter_number, f"第{chapter_number}章")
+        title = CHAPTER_TITLES.get(chapter_number, f"Chapter {chapter_number}")
         db.execute(
             "INSERT OR IGNORE INTO chapters VALUES (?,?,?,?,?,?)",
             (chapter_id, book, chapter_number, title, "2026", "2026"),

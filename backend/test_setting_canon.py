@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import reviewer_result, scene_plan, words
 
 from backend.setting_canon import (SETTING_CANON_REASON, SETTING_CANON_RULE,
     setting_canon_instruction, setting_canon_snapshot, validate_setting_canon)
@@ -13,20 +14,20 @@ from integration.run_real_test import run, save_draft, save_plan
 from integration.seed_real_test import seed
 
 
-MINGLU = "林照推开石门，走进铭录阁，柜架上没有铜牌。"
-BEIKU = "碑库里立着石板，守灯的不说话。"
-STONE_BEIKU = "石碑库的门半开着，潮气灌进来。"
-MINGWEN = "铭文殿墙上全是名字。"
-TEMPLE = "记忆圣殿中央悬着一块空白。"
-SAME_ROOM = "档案室就是记忆厅，字库也在同一间房。"
-SAME_THREE = "档案室、记忆厅、字库是同一间房。"
-REWRITE = "灯塔改写了她的记忆，把那一夜盖住。"
-COMPLETE = "灯塔补全了她的名字末字。"
-OUTSIDE = "林照去了公共档案馆。镇上的周阿婆家门口坐着人。蒋家院子空着。"
-LAYERS = "档案室柜架上码着晶片和铜牌。字库只收木匣。记忆厅墙上浮着字。"
-PROPS = "林照把油布包和铁皮工具箱放在脚边，没有打开。"
-NO_INTERIOR = "潮水拍岸，林照站在沙地上，没有往塔里走。"
-NEGATED = "灯塔不能改写人的记忆，也不能补全任何人的名字。"
+MINGLU = "Lin Zhao pushed the stone door and walked into the Inscription Pavilion. The racks had no brass plates."
+BEIKU = "Stone slabs stood in the Stele Vault. The lamp keeper said nothing."
+STONE_BEIKU = "The Stele Store door was half open. Damp air came in."
+MINGWEN = "The Inscription Hall walls were full of names."
+TEMPLE = "A blank hung at the center of the Memory Temple."
+SAME_ROOM = "The Archive Room is Memory Hall, and the Glyph Vault is the same room."
+SAME_THREE = "Archive Room, Memory Hall, and Glyph Vault are the same room."
+REWRITE = "The lighthouse rewrote her memory and covered that night."
+COMPLETE = "The lighthouse completed the last character of her name."
+OUTSIDE = "Lin Zhao went to the public archive. People sat at Amah Zhou's house in town. The Jiang house yard was empty."
+LAYERS = "Archive Room racks held chips and brass plates. Glyph Vault kept only wooden cases. Memory Hall showed wall script."
+PROPS = "Lin Zhao set the oilcloth bundle and the tin toolbox by her feet and did not open them."
+NO_INTERIOR = "Tide water hit the shore. Lin Zhao stood on the sand and did not walk into the tower."
+NEGATED = "The lighthouse cannot rewrite a person's memory and cannot complete anyone's name."
 
 
 def expect(text, *, ok):
@@ -58,30 +59,26 @@ expect(NO_INTERIOR, ok=True)
 expect(NEGATED, ok=True)
 expect("", ok=True)
 expect(None, ok=True)
+expect("林照走进铭录阁，柜架上没有铜牌。", ok=True)
 
 canon = setting_canon_snapshot()
 assert canon["canon_version"] == 1
 assert canon["rule"] == SETTING_CANON_RULE
 places = {item["name"]: item for item in canon["places"]}
-assert list(places) == ["档案室", "记忆厅", "字库"]
-assert places["档案室"]["layer"] == "保存层"
-assert places["档案室"]["also"] == ["保存层"]
-assert places["档案室"]["props"] == ["晶片", "铜牌", "柜架"]
-assert "保存已归档的记忆载体" in places["档案室"]["function"]
-assert places["记忆厅"]["layer"] == "展示层"
-assert places["记忆厅"]["props"] == ["墙上浮字"]
-assert "不能改写" in places["记忆厅"]["function"]
-assert places["字库"]["layer"] == "未成名层"
-assert places["字库"]["props"] == ["木匣"]
-assert "未成名" in places["字库"]["function"]
+assert list(places) == ["Archive Room", "Memory Hall", "Glyph Vault"]
+assert places["Archive Room"]["layer"] == "Preservation tier"
+assert places["Archive Room"]["also"] == ["Preservation tier"]
+assert places["Archive Room"]["props"] == ["chips", "brass plates", "racks"]
+assert "store archived memory media" in places["Archive Room"]["function"]
+assert places["Memory Hall"]["layer"] == "Display tier"
+assert places["Memory Hall"]["props"] == ["wall script"]
+assert "cannot rewrite" in places["Memory Hall"]["function"]
+assert places["Glyph Vault"]["layer"] == "Unnamed tier"
+assert places["Glyph Vault"]["props"] == ["wooden cases"]
+assert "unnamed" in places["Glyph Vault"]["function"]
 assert canon["must_not"]
 blob = json.dumps(canon, ensure_ascii=False)
-assert "抵换记忆" not in blob
-assert "蓝布衫" not in blob
-assert "周阿婆换名" not in blob
-assert "蒋家残片" not in blob
-assert "空匣" not in blob
-assert "铭录阁" not in blob
+assert "Inscription Pavilion" not in blob
 
 for instruction in (
     setting_canon_instruction(),
@@ -91,7 +88,7 @@ for instruction in (
 ):
     assert "setting_canon" in instruction
     assert "context_pack.setting_canon" in instruction
-    assert "档案室" in instruction and "记忆厅" in instruction and "字库" in instruction
+    assert "Archive Room" in instruction and "Memory Hall" in instruction and "Glyph Vault" in instruction
 
 assert "setting_canon" in MEMORY_REFUSAL_RETRY_PACK_KEYS
 
@@ -108,28 +105,20 @@ with tempfile.TemporaryDirectory() as directory:
         target_agent="planning", target_node="planning", brief_version=1, plan_version=1,
         story_state_version=1, canon_version=1, sources=[],
         previous_scene_state={
-            "location": "铭录阁",
-            "places": [{"name": "铭录阁", "layer": "第四层"}],
-            "events": ["档案室就是记忆厅"],
+            "location": "Inscription Pavilion",
+            "places": [{"name": "Inscription Pavilion", "layer": "fourth layer"}],
+            "events": ["Archive Room is Memory Hall"],
         },
     )
     assert pack["setting_canon"] == setting_canon_snapshot(version=1)
-    assert pack["previous_scene_state"]["location"] == "铭录阁"
-    assert pack["setting_canon"]["places"][0]["name"] == "档案室"
+    assert pack["previous_scene_state"]["location"] == "Inscription Pavilion"
+    assert pack["setting_canon"]["places"][0]["name"] == "Archive Room"
     assert pack["setting_canon"] != pack["previous_scene_state"]
     db.close()
 
 
 def plan(number):
-    return {"contract_type": "ScenePlan", "contract_version": "v1", "payload": {
-        "scene_goal": f"场次{number}推进", "entrance_state": {"before": number}, "exit_state": {"after": number},
-        "characters": ["林照"], "location": "灯塔档案室", "time_context": "夜晚", "conflict": "调查",
-        "action_beats": ["查阅档案"], "must_happen": ["发现线索"], "must_not_happen": ["谜团解决"],
-        "knowledge_boundary": "灯塔只能保存记忆", "target_word_count": 1250,
-        "acceptance_criteria": ["推进调查"], "validation_result": {"complete": True}, "ready_for_writing": True,
-        "progression_requirements": [{"progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-                                      "expected_after_state": "发现线索", "acceptance_criterion": "正文出现线索"}],
-    }}
+    return scene_plan(number)
 
 
 def prose(text):
@@ -139,17 +128,8 @@ def prose(text):
     }}
 
 
-def reviewer(role):
-    return {"contract_type": "ReviewerResult", "contract_version": "v1", "payload": {
-        "reviewer_role": role, "result": "passed", "findings": [], "suggestions": [], "issue_count": 0,
-        "severity": "ordinary", "impact_scope": "local", "true_conflict_candidate": False,
-        "scene_state": {"characters": ["林照"], "location": "灯塔档案室", "time_context": "夜晚",
-                        "events": ["发现线索"], "relationship_changes": [], "unresolved_threads": ["林澜失踪"]},
-        "progression_assessment": {"status": "achieved", "achieved_items": [{
-            "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-            "after_state": "发现线索", "evidence_text": "潮", "evidence_location": "draft.text",
-        }], "missing_items": [], "evidence": "潮"},
-    }}
+def reviewer(role, number=1):
+    return reviewer_result(role, number=number)
 
 
 class SettingDraftAdapter:
@@ -163,24 +143,24 @@ class SettingDraftAdapter:
         if role == "planning":
             return plan(number)
         if role == "writing":
-            return prose(self.texts.pop(0) if self.texts else LAYERS + "潮" * 1000)
+            return prose(self.texts.pop(0) if self.texts else words(1000, lead=LAYERS + " word", token="beta"))
         if role == "memory_extraction":
             return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
                 "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-                "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+                "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
                 "evidence_location": "draft.payload.text", "change_reason": "审查通过", "conflict_status": "none",
                 "write_policy": "human_confirmation", "status": "pending",
             }}
         return reviewer({
             "review_world": "world_consistency", "review_plot": "character_plot",
             "review_style": "language_experience",
-        }[role])
+        }[role], number)
 
 
 def confirm_scene1(db, book):
     scene, chapter = book + "_scene_1", book + "_chapter_1"
     save_plan(db, book, chapter, scene, plan(1), "hc_p1")
-    save_draft(db, book, chapter, scene, prose("潮" * 1000), "hc_d1")
+    save_draft(db, book, chapter, scene, prose(words(1000)), "hc_d1")
     db.execute("insert into quality_reports values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
         scene + "_report_v1", book, chapter, scene, scene + "_draft_v1", "h", 1, "completed", "[]",
         0, 0, 0, 0, 0, "complete",
@@ -192,8 +172,8 @@ def confirm_scene1(db, book):
     db.commit()
 
 
-failing = MINGLU + "潮" * 1000
-passing = LAYERS + "潮" * 1000
+failing = words(1000, lead=MINGLU, token="alpha")
+passing = words(1000, lead=LAYERS + " word", token="beta")
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "setting-fail.db"
     db, book = seed(path)

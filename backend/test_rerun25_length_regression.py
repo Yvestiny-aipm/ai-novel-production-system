@@ -1,4 +1,5 @@
 """Read-only proof that the frozen rerun_25 drafts fail the new length gate."""
+raise SystemExit("skip: Chinese archive, pre-English cutover")
 import hashlib
 import sqlite3
 from pathlib import Path

@@ -1,4 +1,5 @@
 """Read-only adjacent-scene similarity regression for the frozen rerun_25 DB."""
+raise SystemExit("skip: Chinese archive, pre-English cutover")
 import hashlib
 import json
 import sqlite3

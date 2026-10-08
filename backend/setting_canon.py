@@ -5,19 +5,29 @@ import re
 SETTING_CANON_VERSION = 1
 SETTING_CANON_RULE = "setting_canon_v1"
 SETTING_CANON_REASON = "setting_canon_conflict"
-INVENTED_OFFICIAL_LAYERS = ("铭录阁", "石碑库", "碑库", "铭文殿", "记忆圣殿")
-OFFICIAL_ROOMS = ("档案室", "记忆厅", "字库")
-MERGE_MARKERS = ("同一间", "同一处", "同一个房间", "同一房间")
-NEGATION_TAILS = ("不", "不得", "不能", "禁止")
+INVENTED_OFFICIAL_LAYERS = (
+    "Inscription Pavilion", "Stele Vault", "Stele Store", "Inscription Hall", "Memory Temple",
+)
+OFFICIAL_ROOMS = ("Archive Room", "Memory Hall", "Glyph Vault")
+MERGE_MARKERS = ("the same room", "the same place", "one room", "a single room")
+NEGATION_TAILS = ("not", "cannot", "must not", "never")
 ROOM_IS = re.compile(
-    r"(档案室|记忆厅|字库)(?:[^。！？\n]{0,20})(就是|也是|即是|即)(?:[^。！？\n]{0,8})(档案室|记忆厅|字库)"
+    r"(Archive Room|Memory Hall|Glyph Vault)(?:[^.!?\n]{0,20})(is also|is|equals)(?:[^.!?\n]{0,8})(Archive Room|Memory Hall|Glyph Vault)",
+    re.IGNORECASE,
 )
 ROOM_AND_SAME = re.compile(
-    r"(档案室|记忆厅|字库)(?:[^。！？\n]{0,24})(?:和|与|、)(?:[^。！？\n]{0,12})"
-    r"(档案室|记忆厅|字库)(?:[^。！？\n]{0,16})(同一间|同一处|同一个房间|同一房间)"
+    r"(Archive Room|Memory Hall|Glyph Vault)(?:[^.!?\n]{0,24})(?:and|,)(?:[^.!?\n]{0,12})"
+    r"(Archive Room|Memory Hall|Glyph Vault)(?:[^.!?\n]{0,16})(the same room|the same place|one room|a single room)",
+    re.IGNORECASE,
 )
-REWRITE_MEMORY = re.compile(r"灯塔(.{0,32})(改写|修改|覆盖|删除)(.{0,16})记忆")
-COMPLETE_NAME = re.compile(r"灯塔(.{0,24})补[上全](.{0,8})(名字|末字)")
+REWRITE_MEMORY = re.compile(
+    r"lighthouse(.{0,32})(rewrote|rewrite|alter|overwrite|delete|deleted|overwrote)(.{0,16})memory",
+    re.IGNORECASE,
+)
+COMPLETE_NAME = re.compile(
+    r"lighthouse(.{0,24})(completed|completes|filled in|fill in)(.{0,24})(name|last character)",
+    re.IGNORECASE,
+)
 
 
 def setting_canon_snapshot(*, version: int = SETTING_CANON_VERSION) -> dict:
@@ -26,44 +36,44 @@ def setting_canon_snapshot(*, version: int = SETTING_CANON_VERSION) -> dict:
         "rule": SETTING_CANON_RULE,
         "places": [
             {
-                "name": "档案室",
-                "also": ["保存层"],
-                "layer": "保存层",
-                "props": ["晶片", "铜牌", "柜架"],
-                "function": "保存已归档的记忆载体",
+                "name": "Archive Room",
+                "also": ["Preservation tier"],
+                "layer": "Preservation tier",
+                "props": ["chips", "brass plates", "racks"],
+                "function": "store archived memory media",
             },
             {
-                "name": "记忆厅",
-                "also": ["展示层"],
-                "layer": "展示层",
-                "props": ["墙上浮字"],
-                "function": "展示被调取的记忆，不能改写",
+                "name": "Memory Hall",
+                "also": ["Display tier"],
+                "layer": "Display tier",
+                "props": ["wall script"],
+                "function": "display retrieved memory; cannot rewrite",
             },
             {
-                "name": "字库",
-                "also": ["未成名层"],
-                "layer": "未成名层",
-                "props": ["木匣"],
-                "function": "存放未成名的字",
+                "name": "Glyph Vault",
+                "also": ["Unnamed tier"],
+                "layer": "Unnamed tier",
+                "props": ["wooden cases"],
+                "function": "hold unnamed glyphs",
             },
         ],
         "must_not": [
-            "改写、覆盖或删除人的记忆",
-            "补全任何人的名字或末字",
-            "发明第四套官方存放或展示系统",
-            "把档案室、记忆厅、字库写成同一间房",
-            "把公共档案馆、镇上、周阿婆家、蒋家并入灯塔内部",
+            "rewrite, overwrite, or delete a person's memory",
+            "complete anyone's name or last character",
+            "invent a fourth official storage or display system",
+            "write Archive Room, Memory Hall, and Glyph Vault as the same room",
+            "treat the public archive, the town, Amah Zhou's house, or the Jiang house as inside the lighthouse",
         ],
     }
 
 
 def setting_canon_instruction() -> str:
     return (
-        "场地分层以 context_pack.setting_canon 为准。"
-        "灯塔本体只有档案室、记忆厅、字库三层，可以同时存在，不得写成同一间房。"
-        "灯塔只能保存、检索、展示，不得改写、覆盖、删除人的记忆，不得补全任何人的名字或末字。"
-        "禁止再发明第四套官方存放或展示系统。"
-        "公共档案馆、镇上、周阿婆家、蒋家不是灯塔内部。"
+        "Places follow context_pack.setting_canon."
+        "The lighthouse body has only Archive Room, Memory Hall, and Glyph Vault. They may exist at the same time. Do not write them as the same room."
+        "The lighthouse may only store, retrieve, and display. It must not rewrite, overwrite, or delete a person's memory, and must not complete anyone's name or last character."
+        "Do not invent a fourth official storage or display system."
+        "The public archive, the town, Amah Zhou's house, and the Jiang house are not inside the lighthouse."
     )
 
 
@@ -72,8 +82,8 @@ def _excerpt(text: str, start: int, end: int) -> str:
 
 
 def _negated(gap: str) -> bool:
-    tail = gap[-4:]
-    return any(gap.endswith(token) or token in tail for token in NEGATION_TAILS)
+    tail = gap[-12:].lower()
+    return any(gap.lower().endswith(token) or token in tail for token in NEGATION_TAILS)
 
 
 def _invented_layer_conflicts(text: str) -> list[dict]:
@@ -85,7 +95,7 @@ def _invented_layer_conflicts(text: str) -> list[dict]:
         conflicts.append({
             "kind": "invented_official_layer",
             "name": name,
-            "expected": "档案室 / 记忆厅 / 字库",
+            "expected": "Archive Room / Memory Hall / Glyph Vault",
             "found": name,
             "excerpt": _excerpt(text, index, index + len(name)),
         })
@@ -96,23 +106,23 @@ def _invented_layer_conflicts(text: str) -> list[dict]:
 def _same_room_conflicts(text: str) -> list[dict]:
     conflicts = []
     for match in ROOM_IS.finditer(text):
-        if match.group(1) == match.group(3):
+        if match.group(1).lower() == match.group(3).lower():
             continue
         conflicts.append({
             "kind": "collapsed_layers",
             "name": f"{match.group(1)}/{match.group(3)}",
-            "expected": "三层同时存在，不是同一间房",
+            "expected": "three layers exist at once, not the same room",
             "found": match.group(0),
             "excerpt": _excerpt(text, match.start(), match.end()),
         })
         return conflicts
     for match in ROOM_AND_SAME.finditer(text):
-        if match.group(1) == match.group(2):
+        if match.group(1).lower() == match.group(2).lower():
             continue
         conflicts.append({
             "kind": "collapsed_layers",
             "name": f"{match.group(1)}/{match.group(2)}",
-            "expected": "三层同时存在，不是同一间房",
+            "expected": "three layers exist at once, not the same room",
             "found": match.group(0),
             "excerpt": _excerpt(text, match.start(), match.end()),
         })
@@ -120,16 +130,16 @@ def _same_room_conflicts(text: str) -> list[dict]:
     for marker in MERGE_MARKERS:
         start = 0
         while True:
-            index = text.find(marker, start)
+            index = text.lower().find(marker, start)
             if index < 0:
                 break
-            window = text[max(0, index - 24):index + len(marker)]
-            rooms = [name for name in OFFICIAL_ROOMS if name in window]
+            window = text[max(0, index - 48):index + len(marker)]
+            rooms = [name for name in OFFICIAL_ROOMS if name.lower() in window.lower()]
             if len(rooms) >= 2:
                 conflicts.append({
                     "kind": "collapsed_layers",
                     "name": "/".join(rooms),
-                    "expected": "三层同时存在，不是同一间房",
+                    "expected": "three layers exist at once, not the same room",
                     "found": marker,
                     "excerpt": _excerpt(text, index, index + len(marker)),
                 })
@@ -145,8 +155,8 @@ def _rewrite_memory_conflicts(text: str) -> list[dict]:
             continue
         conflicts.append({
             "kind": "memory_rewrite",
-            "name": "灯塔",
-            "expected": "只能保存、检索、展示",
+            "name": "lighthouse",
+            "expected": "may only store, retrieve, and display",
             "found": match.group(2),
             "excerpt": _excerpt(text, match.start(), match.end()),
         })
@@ -161,8 +171,8 @@ def _complete_name_conflicts(text: str) -> list[dict]:
             continue
         conflicts.append({
             "kind": "name_completion",
-            "name": "灯塔",
-            "expected": "不能补全名字或末字",
+            "name": "lighthouse",
+            "expected": "must not complete a name or last character",
             "found": match.group(3),
             "excerpt": _excerpt(text, match.start(), match.end()),
         })

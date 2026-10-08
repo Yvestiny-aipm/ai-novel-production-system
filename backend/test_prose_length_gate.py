@@ -3,11 +3,12 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import words
 
 from backend.harness import PLANNING_PROMPT_VERSION
-from backend.prose_length import (DEFAULT_TARGET_WORD_COUNT, GATE_MIN_CHARACTER_COUNT,
+from backend.prose_length import (DEFAULT_TARGET_WORD_COUNT,
     MAX_CHARACTER_COUNT, MIN_CHARACTER_COUNT, PREFERRED_SOFT_MAX, PREFERRED_SOFT_MIN,
-    WRITING_PROMPT_VERSION, actual_character_count, length_revision_feedback,
+    WRITING_PROMPT_VERSION, actual_character_count, actual_word_count, length_revision_feedback,
     planning_length_rework_feedback, validate_prose_length)
 from backend.siliconflow import (build_chat_messages, first_draft_writing_instruction,
     writing_length_edit_instruction, writing_quality_edit_instruction)
@@ -17,30 +18,28 @@ from integration.seed_real_test import seed
 
 def prose(size, reported=1250):
     return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
-        "text": "潮" * size, "word_count": reported, "target_word_count": 1250,
+        "text": words(size), "word_count": reported, "target_word_count": 1250,
         "complete": True, "writer_self_check": {"complete": True},
     }}
 
 
-# Whitespace never counts; all remaining visible characters do.
-assert GATE_MIN_CHARACTER_COUNT == 800
 assert MIN_CHARACTER_COUNT == 1000
-assert MAX_CHARACTER_COUNT == 2300
-assert WRITING_PROMPT_VERSION == "prose_quality_v8"
-assert actual_character_count(" 潮\n痕\t") == 2
+assert MAX_CHARACTER_COUNT == 1500
+assert WRITING_PROMPT_VERSION == "prose_quality_v9"
+assert actual_word_count(" don't  it's\nnow") == 3
+assert actual_character_count(" don't  it's\nnow") == 3
+assert validate_prose_length("潮" * 1000)["length_validation_reason"] == "under_length"
 for size, status, reason in ((0, "failed", "empty_text"), (346, "failed", "under_length"),
-                             (799, "failed", "under_length"), (800, "passed", None),
-                             (999, "passed", None), (1000, "passed", None),
-                             (1250, "passed", None), (1500, "passed", None),
-                             (1501, "passed", None), (2300, "passed", None),
-                             (2301, "failed", "over_length")):
-    result = validate_prose_length("潮" * size)
+                             (799, "failed", "under_length"), (999, "failed", "under_length"),
+                             (1000, "passed", None), (1250, "passed", None), (1500, "passed", None),
+                             (1501, "failed", "over_length")):
+    result = validate_prose_length(words(size) if size else "")
     assert (result["actual_character_count"], result["length_validation_status"], result["length_validation_reason"]) == (size, status, reason)
 
 
 def failed_draft(draft_id, size, reason, attempt=1):
     return {
-        "draft_id": draft_id, "text": "潮" * size, "actual_character_count": size,
+        "draft_id": draft_id, "text": words(size), "actual_character_count": size,
         "length_validation_status": "failed", "length_validation_reason": reason,
         "content_attempt_in_plan": attempt,
     }
@@ -55,7 +54,7 @@ assert expand["required_maximum_character_delta"] == MAX_CHARACTER_COUNT - 682
 assert expand["preferred_character_delta"] == 1250 - 682
 assert expand["preferred_output_minimum"] == PREFERRED_SOFT_MIN
 assert expand["preferred_output_maximum"] == PREFERRED_SOFT_MAX
-assert expand["previous_text"] == "潮" * 682
+assert expand["previous_text"] == words(682)
 assert "previous_model_reported_word_count" not in expand
 trim = length_revision_feedback(failed_draft("s_draft_v2", 2317, "over_length", 2))
 assert trim["adjustment_direction"] == "trim" and trim["character_delta_to_target"] == 1250 - 2317
@@ -88,15 +87,14 @@ assert [item["role"] for item in first_messages] == ["system", "user", "user"]
 assert "contract_type" in first_messages[0]["content"] and "ProseDraft" in first_messages[0]["content"]
 assert "revision_feedback" not in first_messages[1]["content"]
 assert first_messages[2]["content"] == first_draft_writing_instruction()
-assert "1000～2300" in first_messages[2]["content"] and "1200～1350" in first_messages[2]["content"]
-assert "800～2300" not in first_messages[2]["content"]
-assert "不能只改word_count" in first_messages[2]["content"]
-assert "超过2300不合格" in first_messages[2]["content"]
-assert "必须压到硬上限以下" in first_messages[2]["content"]
-assert "不是官方计数" in first_messages[2]["content"]
+assert "1000" in first_messages[2]["content"] and "1500" in first_messages[2]["content"]
+assert "1200" in first_messages[2]["content"] and "1350" in first_messages[2]["content"]
+assert "words" in first_messages[2]["content"]
+assert "Chinese characters" not in first_messages[2]["content"]
+assert "非空白字符" not in first_messages[2]["content"]
 assert "must_not_happen" in first_messages[2]["content"]
 assert "knowledge_boundary" in first_messages[2]["content"]
-assert "已批准世界规则" in first_messages[2]["content"]
+assert "approved world rules" in first_messages[2]["content"]
 
 under_request = {"contract_type": "ProseDraft", "input": {
     "context_pack": {"pack_id": "p1"}, "scene_plan": {"payload": {"scene_goal": "推进"}},
@@ -116,29 +114,27 @@ assert under_messages[2]["content"] == writing_length_edit_instruction(gates7_ex
 assert over_messages[2]["content"] == writing_length_edit_instruction(gates7_trim)
 assert under_messages[2]["content"] != over_messages[2]["content"]
 assert gates7_expand["previous_text"] not in under_messages[2]["content"]
-assert "至少增加317" in under_messages[2]["content"] and "建议增加567" in under_messages[2]["content"]
-assert "写得更具体" in under_messages[2]["content"]
-assert "禁止交回同一篇" in under_messages[2]["content"]
-assert "必须加到硬下限以上" in under_messages[2]["content"]
-assert "会被立即阻断" in under_messages[2]["content"]
-assert "不得新增未铺垫人物、地点、世界机制" in under_messages[2]["content"]
-assert "不得让灯塔具备保存与展示记忆以外的能力" in under_messages[2]["content"]
-assert "至少删除98" in over_messages[2]["content"] and "建议删除1148" in over_messages[2]["content"]
-assert "真正删除" in over_messages[2]["content"]
-assert "禁止交回同一篇" in over_messages[2]["content"]
-assert "必须删到硬上限以下" in over_messages[2]["content"]
-assert "会被立即阻断" in over_messages[2]["content"]
-assert "不能只改word_count" in over_messages[2]["content"]
-assert "不得新增未铺垫人物" not in over_messages[2]["content"]
-assert "写得更具体" not in over_messages[2]["content"]
-assert "整篇不动" not in over_messages[2]["content"]
+assert "Add at least 317" in under_messages[2]["content"] and "preferably 567" in under_messages[2]["content"]
+assert "more concrete" in under_messages[2]["content"]
+assert "Do not resubmit the same draft" in under_messages[2]["content"]
+assert "hard minimum" in under_messages[2]["content"]
+assert "blocked immediately" in under_messages[2]["content"]
+assert "unprepared characters" in under_messages[2]["content"]
+assert "storing and displaying memory" in under_messages[2]["content"]
+assert "Cut at least 898" in over_messages[2]["content"] and "preferably 1148" in over_messages[2]["content"]
+assert "Really delete" in over_messages[2]["content"]
+assert "Do not resubmit the same draft" in over_messages[2]["content"]
+assert "hard maximum" in over_messages[2]["content"]
+assert "blocked immediately" in over_messages[2]["content"]
+assert "only change word_count" in over_messages[2]["content"]
+assert "unprepared characters" not in over_messages[2]["content"]
+assert "more concrete" not in over_messages[2]["content"]
 for instruction in (under_messages[2]["content"], over_messages[2]["content"]):
-    assert "1000～2300" in instruction and "1200～1350" in instruction
-    assert "800～2300" not in instruction
-    assert "后端实算" in instruction
-    assert "不是官方计数" in instruction
+    assert "1000-1500" in instruction and "1200-1350" in instruction
+    assert "words" in instruction
+    assert "Chinese characters" not in instruction
     assert "1287" not in instruction
-assert WRITING_PROMPT_VERSION == "prose_quality_v8"
+assert WRITING_PROMPT_VERSION == "prose_quality_v9"
 reported_trim = length_revision_feedback({
     **failed_draft("h_draft_v2", 1622, "over_length", 2),
     "model_reported_word_count": 1287,
@@ -147,16 +143,16 @@ assert reported_trim["previous_model_reported_word_count"] == 1287
 assert reported_trim["previous_actual_character_count"] == 1622
 reported_trim_text = writing_length_edit_instruction(reported_trim)
 assert "1287" in reported_trim_text and "1622" in reported_trim_text
-assert "以1622为准" in reported_trim_text
-assert "后端实算" in reported_trim_text
-assert "必须删到硬上限以下" in reported_trim_text
-assert "会被立即阻断" in reported_trim_text
-assert "不得新增未铺垫人物" not in reported_trim_text
+assert "Use 1622" in reported_trim_text
+assert "backend counted" in reported_trim_text
+assert "hard maximum" in reported_trim_text
+assert "blocked immediately" in reported_trim_text
+assert "unprepared characters" not in reported_trim_text
 quality_only = {
     "failure_type": "quality_report",
     "reviewer_findings": [{
         "reviewer_role": "world_consistency", "result": "failed", "issue_count": 1,
-        "findings": ["世界规则冲突"],
+        "findings": ["world-rule conflict"],
     }],
 }
 both_messages = build_chat_messages({"contract_type": "ProseDraft", "input": {
@@ -166,12 +162,11 @@ both_messages = build_chat_messages({"contract_type": "ProseDraft", "input": {
 }})
 assert both_messages[2]["content"] == writing_length_edit_instruction(gates7_expand)
 assert both_messages[3]["content"] == writing_quality_edit_instruction(quality_only)
-assert "不得新增未铺垫人物" in both_messages[2]["content"]
-assert "世界规则冲突" in both_messages[3]["content"]
-assert "必须改写或删除" in both_messages[3]["content"]
-assert "保留已通过内容" not in both_messages[3]["content"]
-assert "禁止原样返回" in both_messages[3]["content"]
-assert "禁止只改结构化字段或word_count" in both_messages[3]["content"]
+assert "unprepared characters" in both_messages[2]["content"]
+assert "world-rule conflict" in both_messages[3]["content"]
+assert "rewritten or deleted" in both_messages[3]["content"]
+assert "Do not return the same draft" in both_messages[3]["content"]
+assert "word_count" in both_messages[3]["content"]
 assert planning_length_rework_feedback([
     {"length_validation_reason": "under_length", "actual_character_count": 682},
     {"length_validation_reason": "under_length", "actual_character_count": 624},
@@ -218,7 +213,7 @@ def reviewer(role, number):
         "severity": "ordinary", "impact_scope": "local", "true_conflict_candidate": False,
         "scene_state": {"characters": ["林照"], "location": "灯塔档案室", "time_context": "夜晚",
                         "events": ["发现线索"], "relationship_changes": [], "unresolved_threads": ["林澜失踪"]},
-        "progression_assessment": {"status":"achieved","achieved_items":[{"progress_type":"new_clue","target_key":"灯塔线索","before_state":"未知","after_state":"发现线索","evidence_text":"潮","evidence_location":"draft.text"}],"missing_items":[],"evidence":"潮"},
+        "progression_assessment": {"status":"achieved","achieved_items":[{"progress_type":"new_clue","target_key":"灯塔线索","before_state":"未知","after_state":"发现线索","evidence_text":"word","evidence_location":"draft.text"}],"missing_items":[],"evidence":"word"},
     }}
 
 
@@ -240,7 +235,7 @@ class LengthSequenceAdapter:
         if role == "memory_extraction":
             return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
                 "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-                "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+                "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
                 "evidence_location": "draft.payload.text", "change_reason": "审查通过", "conflict_status": "none",
                 "write_policy": "human_confirmation", "status": "pending",
             }}
@@ -304,9 +299,9 @@ with tempfile.TemporaryDirectory() as directory:
     feedback = calls[1]["input"]["revision_feedback"]
     first_id = "realtest_tide_archive_scene_1_draft_v1"
     first_text = db.execute("select text,actual_character_count,length_validation_status from prose_drafts where draft_id=?", (first_id,)).fetchone()
-    assert first_text == ("潮" * 682, 682, "failed")
+    assert first_text == (words(682), 682, "failed")
     assert feedback["previous_draft_id"] == first_id
-    assert feedback["previous_text"] == "潮" * 682
+    assert feedback["previous_text"] == words(682)
     assert feedback["adjustment_direction"] == "expand"
     assert feedback["character_delta_to_target"] == 1250 - 682
     assert feedback["required_minimum_character_delta"] == 318
@@ -315,7 +310,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert feedback["approximate_output_ratio"] == round(1250 / 682, 2)
     assert calls[1]["input"]["checkpoint"] != calls[0]["input"]["checkpoint"]
     assert not result["scenes"][0]["reused_calls"]
-    assert db.execute("select text from prose_drafts where draft_id=?", (first_id,)).fetchone()[0] == "潮" * 682
+    assert db.execute("select text from prose_drafts where draft_id=?", (first_id,)).fetchone()[0] == words(682)
     db.close()
 
 
@@ -331,11 +326,11 @@ with tempfile.TemporaryDirectory() as directory:
     assert feedback["adjustment_direction"] == "trim"
     assert feedback["character_delta_to_target"] == 1250 - 2317
     assert feedback["previous_draft_id"] == first_id
-    assert feedback["previous_text"] == "潮" * 2317
-    assert db.execute("select text,actual_character_count from prose_drafts where draft_id=?", (first_id,)).fetchone() == ("潮" * 2317, 2317)
+    assert feedback["previous_text"] == words(2317)
+    assert db.execute("select text,actual_character_count from prose_drafts where draft_id=?", (first_id,)).fetchone() == (words(2317), 2317)
     review_calls = [call for call in adapter.calls if call["task_type"].startswith("review_")]
     assert {call["input"]["draft"]["payload"]["word_count"] for call in review_calls} == {1000}
-    assert all("潮" * 2317 not in json.dumps(call["input"]["draft"], ensure_ascii=False) for call in review_calls)
+    assert all(words(2317) not in json.dumps(call["input"]["draft"], ensure_ascii=False) for call in review_calls)
     db.close()
 
 
@@ -466,7 +461,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert all(call["prompt_version"] == WRITING_PROMPT_VERSION for call in writing_calls(second_adapter))
     assert "hc_planted_v2" not in (second["scenes"][0].get("reused_calls") or [])
     draft_text = db.execute("select text from prose_drafts where scene_id=? order by draft_version", ("realtest_tide_archive_scene_1",)).fetchone()[0]
-    assert draft_text == "潮" * 1000
+    assert draft_text == words(1000)
     assert planted_text not in draft_text
     db.close()
 

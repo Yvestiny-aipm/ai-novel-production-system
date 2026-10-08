@@ -1,4 +1,5 @@
 """Read-only progression audit of the frozen five-scene rerun_25 database."""
+raise SystemExit("skip: Chinese archive, pre-English cutover")
 import hashlib
 import json
 import sqlite3

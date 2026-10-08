@@ -1037,7 +1037,7 @@ class SceneRecovery:
             previous = present_scene_state(json.loads(prior['accepted_scene_state_json']))
             story_version = prior['story_state_version']+1
         else: story_version = 1
-        sources = [{'source_id':'brief_real_v1','source_type':'brief','book_id':self.book,'version':1,'content':'潮痕档案：林照调查林澜失踪与灯塔档案；灯塔只能保存和展示记忆。'}]
+        sources = [{'source_id':'brief_real_v1','source_type':'brief','book_id':self.book,'version':1,'content':'Tide-Mark Archive: Lin Zhao investigates Lin Lan missing and the lighthouse archive; the lighthouse may only store and display memory.'}]
         if previous: sources.append({'source_id':f'accepted_scene_{self.number-1}','source_type':'scene_memory','book_id':self.book,'version':story_version-1,'content':previous})
         ledger = load_established_facts(self.db, book_id=self.book, before_scene_number=self.number)
         cp = ContextPackService(self.db).assemble(pack_id=f'{self.scene}_pack_v{cv}',book_id=self.book,chapter_id=self.chapter,scene_id=self.scene,version=cv,target_agent='planning',target_node='planning',brief_version=1,plan_version=pv,story_state_version=story_version,canon_version=1,sources=sources,previous_scene_state=previous,established_facts=ledger,chapter_summary=ledger.get('chapter_summary') or '')

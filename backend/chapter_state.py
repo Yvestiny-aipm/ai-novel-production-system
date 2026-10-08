@@ -30,16 +30,16 @@ def empty_chapter_state() -> dict:
 
 def chapter_state_instruction() -> str:
     return (
-        "context_pack.chapter_state 是本章要到哪，不是新门栏。"
-        "is_chapter_open 时，payload 必须写 chapter_destination：本章结束时要到达的具体去向，或要打开/关闭的一条悬念，不能只写继续调查。"
-        "不得照抄 previous_destination。"
-        "不得把终点只写成在 previous_end_location 再等一次、再复核同一处。"
-        "is_chapter_open 为假且 destination 非空时，本场必须朝 destination 推进。"
-        "is_chapter_close 时本场应抵达该去向，或写下尚未抵达的明确缺口，不得另起一条与 destination 无关的微观察。"
-        "previous_destination 是上一章已经立过的终点，本章不得原地重复。"
-        "已经发生仍以 established_facts / chapter_summary 为准。"
-        "此刻仍以 world_state 为准。"
-        "节奏信号仍以 pacing_state 为准。"
+        "context_pack.chapter_state is where this chapter must go, not a new gate."
+        "When is_chapter_open, the payload must write chapter_destination: a concrete destination at chapter end, or one thread to open or close. Do not write only keep investigating."
+        "Do not copy previous_destination."
+        "Do not write the destination as waiting again or rechecking the same place at previous_end_location."
+        "When is_chapter_open is false and destination is not empty, this scene must advance toward destination."
+        "When is_chapter_close, this scene should reach that destination, or write the explicit gap that is still unreached. Do not start a micro-observation unrelated to destination."
+        "previous_destination is the destination the last chapter already set. This chapter must not repeat it in place."
+        "What already happened still follows established_facts / chapter_summary."
+        "The now-state still follows world_state."
+        "Pacing still follows pacing_state."
     )
 
 

@@ -1,5 +1,6 @@
 import json, sqlite3, tempfile
 from pathlib import Path
+from backend.test_english_fixtures import words
 from harness import (Harness, ModelProfile, MockAdapter, required_fields_validator, ContractFormatError,
     PLANNING_PROMPT_VERSION, REVIEWER_PROMPT_VERSION, REVIEWER_ROLE_BY_TASK, validate_reviewer_result_against_input,
     validate_reviewer_result_for_task)
@@ -188,18 +189,18 @@ assert world_messages[2]["content"] != plot_messages[2]["content"] != style_mess
 assert "world_consistency" in world_messages[2]["content"]
 assert "character_plot" in plot_messages[2]["content"]
 assert "language_experience" in style_messages[2]["content"]
-assert "不得冒充 character_plot" in world_messages[2]["content"]
-assert "不得冒充 character_plot" in style_messages[2]["content"]
+assert "Do not impersonate character_plot." in world_messages[2]["content"]
+assert "Do not impersonate character_plot." in style_messages[2]["content"]
 assert reviewer_findings_instruction() in world_messages[2]["content"]
 assert reviewer_findings_instruction() in plot_messages[2]["content"]
 assert reviewer_findings_instruction() in style_messages[2]["content"]
-assert "不得为了显得认真而强行制造 findings" in reviewer_findings_instruction()
-assert "允许 findings=[]" in reviewer_findings_instruction()
+assert "Do not invent findings to look thorough." in reviewer_findings_instruction()
+assert "findings=[]" in reviewer_findings_instruction()
 assert reviewer_findings_instruction() in reviewer_correction_instruction()
 assert "pass_with_notes" in reviewer_correction_instruction()
 assert "partial" in plot_messages[2]["content"]
 assert "partially_achieved" in plot_messages[2]["content"]
-assert "有至少一个合法 achieved_item" in plot_messages[2]["content"]
+assert "at least one legal achieved_item" in plot_messages[2]["content"]
 assert reviewer_evidence_instruction() in plot_messages[2]["content"]
 assert "evidence_text in draft.payload.text" in plot_messages[2]["content"]
 assert REVIEWER_PROMPT_VERSION == "reviewer_contract_v8"
@@ -234,7 +235,7 @@ def plan(number):
 
 def prose(size):
     return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
-        "text": "潮" * size, "word_count": 1250, "target_word_count": 1250,
+        "text": words(size), "word_count": 1250, "target_word_count": 1250,
         "complete": True, "writer_self_check": {"complete": True},
     }}
 
@@ -249,8 +250,8 @@ def runner_reviewer(role):
         payload["progression_assessment"] = {
             "status": "achieved", "achieved_items": [{
                 "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-                "after_state": "发现线索", "evidence_text": "潮", "evidence_location": "draft.text",
-            }], "missing_items": [], "evidence": "潮",
+                "after_state": "发现线索", "evidence_text": "word", "evidence_location": "draft.text",
+            }], "missing_items": [], "evidence": "word",
         }
     return {"contract_type": "ReviewerResult", "contract_version": "v1", "payload": payload}
 
@@ -258,7 +259,7 @@ def runner_reviewer(role):
 def memory():
     return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
         "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
         "evidence_location": "draft.payload.text", "change_reason": "审查通过", "conflict_status": "none",
         "write_policy": "human_confirmation", "status": "pending",
     }}
@@ -324,7 +325,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert world_calls
     assert all(call["prompt_version"] == REVIEWER_PROMPT_VERSION for call in world_calls)
     assert "hc_planted_review_v1" not in (second["scenes"][0].get("reused_calls") or [])
-    assert WRITING_PROMPT_VERSION == "prose_quality_v5"
+    assert WRITING_PROMPT_VERSION == "prose_quality_v9"
     assert {call["prompt_version"] for call in second_adapter.calls if call["task_type"] == "planning"} <= {PLANNING_PROMPT_VERSION}
     assert {call["prompt_version"] for call in second_adapter.calls if call["task_type"] == "writing"} <= {WRITING_PROMPT_VERSION}
 
@@ -398,7 +399,7 @@ expect_plot_input_invalid(
 expect_plot_input_invalid(achieved=[plot_item(after_state="无关结果")])
 
 
-LONG_PROSE = "林照在档案室停住。管理员挡住门口。夜风穿过窗缝。" + ("档案纸页在灯光下翻动。" * 120)
+LONG_PROSE = words(1200, lead="林照在档案室停住。管理员挡住门口。夜风穿过窗缝。", token="page")
 PLAN_ITEM = {
     "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
     "after_state": "发现线索", "evidence_text": "林照在档案室停住。", "evidence_location": "draft.text",

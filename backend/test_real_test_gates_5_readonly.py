@@ -1,4 +1,5 @@
 """Stable, read-only audit of data/real_test_gates_5.db."""
+raise SystemExit("skip: Chinese archive, pre-English cutover")
 import hashlib
 import json
 import sqlite3

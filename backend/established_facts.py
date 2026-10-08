@@ -21,83 +21,67 @@ WORLD_STATE_REASON = "world_state_conflict"
 MEASURE_LOOKAROUND = 16
 OFFSTAGE_ARRIVAL_LOOKAHEAD = 12
 MEASURE_UNCHANGED_MARKERS = tuple(sorted((
-    "和昨日记住", "和昨天", "和昨日", "与昨天", "与昨日",
-    "没有变", "未变", "分毫不差", "一样", "仍是",
+    "same as yesterday", "as yesterday", "unchanged", "exactly the same",
+    "still the same", "has not changed",
 ), key=len, reverse=True))
 SAME_DAY_YESTERDAY = tuple(sorted((
-    "昨天新", "昨日新", "昨天刚", "昨日刚", "昨天上场", "昨日上场",
-    "昨天打在", "昨日打在", "昨天量", "昨日量", "昨天露", "昨日露",
+    "yesterday just", "yesterday's new", "just yesterday", "yesterday newly",
 ), key=len, reverse=True))
 OFFSTAGE_ARRIVAL = tuple(sorted((
-    "跟着来了", "跟着来", "也到了", "随行到", "走进来", "来到这里", "一起来了",
+    "came with her", "showed up here", "walked in", "came along", "arrived here",
 ), key=len, reverse=True))
 OFFSTAGE_MARKERS = tuple(sorted((
-    "未登场",
-    "不随行",
-    "已留在",
-    "未到场",
-    "未上场",
-    "不在场",
-    "已离开",
-    "仍在原处",
-    "未同行",
-    "没有到场",
+    "not onstage",
+    "did not come",
+    "stayed behind",
+    "already left",
+    "did not follow",
+    "not present",
+    "has not arrived",
+    "remained behind",
+    "did not come along",
+    "was not there",
 ), key=len, reverse=True))
-CLOCK_HOURS = tuple("子丑寅卯辰巳午未申酉戌亥")
-CLOCK_SUFFIXES = ("未到", "已过", "三刻", "二刻", "一刻", "正刻", "初刻")
+CLOCK_HOUR_NUMS = tuple(str(i) for i in range(1, 13))
+CLOCK_HOUR_WORDS = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
 CLOCK_PHRASES = tuple(sorted(
-    [hour + "时" + suffix for hour in CLOCK_HOURS for suffix in CLOCK_SUFFIXES]
-    + [hour + "时" for hour in CLOCK_HOURS],
+    [f"{hour} o'clock" for hour in CLOCK_HOUR_NUMS + CLOCK_HOUR_WORDS]
+    + [f"{hour} a.m." for hour in CLOCK_HOUR_NUMS]
+    + [f"{hour} p.m." for hour in CLOCK_HOUR_NUMS]
+    + ["midnight", "noon", "a.m.", "p.m.", "o'clock"],
     key=len, reverse=True,
 ))
-MEASURE_AMOUNTS = ("一", "二", "两", "三", "四", "五", "六", "七", "八", "九", "十", "半")
-MEASURE_UNITS = ("指", "拃", "步", "尺", "里")
-MEASURE_SUFFIXES = ("多一点", "出头", "略多", "略少", "半")
-MEASURE_PHRASES = tuple(sorted({
-    amount + unit + suffix
-    for amount in MEASURE_AMOUNTS
-    for unit in MEASURE_UNITS
-    for suffix in ("",) + MEASURE_SUFFIXES
-}, key=len, reverse=True))
+MEASURE_PHRASES = tuple(sorted((
+    "three steps", "two steps", "one step", "a step",
+    "two spans", "one span", "a span",
+    "two fingers", "one finger", "a finger",
+), key=len, reverse=True))
 DAY_NEXT_MARKERS = tuple(sorted((
-    "隔夜", "次日", "次夜", "翌日", "第二天", "相隔一日", "隔一日",
+    "the next day", "next night", "a day later", "next day", "overnight",
 ), key=len, reverse=True))
 DAY_SAME_MARKERS = tuple(sorted((
-    "同日", "同一天", "当日", "同一夜", "紧接上一场", "紧接上场",
+    "the same day", "that same day", "same night", "same day",
+    "right after the last scene",
 ), key=len, reverse=True))
-ESTABLISHED_NEGATION_LOOKBEHIND = 8
+ESTABLISHED_NEGATION_LOOKBEHIND = 16
 ESTABLISHED_NEGATIONS = tuple(sorted((
-    "从未进入",
-    "从未进过",
-    "从来没有进入",
-    "从来没进入",
-    "从来没进过",
-    "从来没有进过",
-    "一层也没进",
-    "一层都没进",
-    "一层也没进过",
-    "一层都没进过",
-    "从未见面",
-    "从未见过",
-    "从未现身",
-    "从来没有见过",
-    "从来没见过",
-    "从来没有现身",
-    "从来没现身",
-    "均未进入",
-    "仍未现身",
+    "still has not appeared",
+    "has never appeared",
+    "has never entered",
+    "had never entered",
+    "has never shown",
+    "has never met",
+    "never went in",
+    "never entered",
+    "never appeared",
+    "never met",
 ), key=len, reverse=True))
-SCENE_SCOPED_MARKERS = ("本场", "此场", "这一场", "今日", "当天", "今晚", "今夜")
+SCENE_SCOPED_MARKERS = ("this scene", "tonight", "today", "this night")
 SCENE_ABSENCE_EXTRA = (
-    "未跨门槛",
-    "没有跨过门槛",
-    "门槛未跨",
-    "仍未跨门槛",
-    "未跨过门槛",
-    "本场未进入",
-    "此场未进入",
-    "这一场未进入",
-    "仍未进入",
+    "did not cross the threshold",
+    "has not crossed the threshold",
+    "this scene did not enter",
+    "still has not entered",
 )
 SCENE_STATE_LIST_FIELDS = ("characters", "events", "relationship_changes", "unresolved_threads")
 SCENE_STATE_SCALAR_FIELDS = ("location", "time_context")
@@ -110,23 +94,21 @@ EMPTY_SCENE_STATE = {
     "time_context": "",
 }
 IRREVERSIBLE_MARKERS = tuple(sorted((
-    "进入",
-    "进了",
-    "走进",
-    "踏入",
-    "登上",
-    "见到",
-    "遇见",
-    "相遇",
-    "现身",
-    "揭开封条",
-    "打开木匣",
-    "开了匣",
-    "死去",
-    "身亡",
+    "walked into",
+    "stepped into",
+    "opened the case",
+    "opened the box",
+    "climbed to",
+    "went in",
+    "entered",
+    "appeared",
+    "encountered",
+    "met ",
+    "died",
+    "was killed",
 ), key=len, reverse=True))
-IRREVERSIBLE_NEGATION = ("未", "不", "没", "非")
-IRREVERSIBLE_LOOKBEHIND = 4
+IRREVERSIBLE_NEGATION = ("not ", "never ", "no ", "n't")
+IRREVERSIBLE_LOOKBEHIND = 8
 
 
 def established_facts_snapshot(*, version: int = ESTABLISHED_FACTS_VERSION, facts=None, chapter_summary="") -> dict:
@@ -140,11 +122,11 @@ def established_facts_snapshot(*, version: int = ESTABLISHED_FACTS_VERSION, fact
 
 def established_facts_instruction() -> str:
     return (
-        "已成立事实以 context_pack.established_facts 为准，这些是已经发生。"
-        "previous_scene_state 与 progression_baseline 只是上场此刻，且已去掉未进入/未跨门槛/均未进入这类未发生表述。"
-        "不得把此刻未发生抄成全书从未发生。"
-        "kind=canon 是不可逆已发生，裁剪不会丢掉，不得写成从未发生。"
-        "context_pack.chapter_summary 是被账本裁掉的中间已发生；已经发生，每章各留已发生的一句或首尾两句，细节不完整；不得写成从未发生，也不得发明摘要里没有的新结局。"
+        "Established facts are context_pack.established_facts. These already happened."
+        "previous_scene_state and progression_baseline are only the last scene's now-state, with never-entered / did-not-cross-the-threshold phrasing already removed."
+        "Do not copy a now-state absence as a book-wide never-happened."
+        "kind=canon is irreversible and already happened; trim will not drop it; do not write it as never happened."
+        "context_pack.chapter_summary is mid-book events dropped from the ledger; they already happened; each chapter keeps one or two sentences; details are incomplete; do not write them as never happened, and do not invent an ending the summary does not have."
     )
 
 
@@ -154,19 +136,20 @@ def empty_world_state() -> dict:
 
 def world_state_instruction() -> str:
     return (
-        "context_pack.world_state 是上场结束时的此刻。"
-        "本场从这里接着写，不得把 offstage 写成跟着来了，"
-        "clocks 里已有的时辰不得改成另一个时辰或另一个刻，"
-        "measures 里已有的量记不得改成另一个数，"
-        "day_relation=same_day 时不得把上场刚发生的事写成昨日/昨天，"
-        "day_relation=next_day 时昨日可以指上场。"
-        "已经发生仍以 established_facts / chapter_summary 为准。"
-        "写反按内容失败。"
+        "context_pack.world_state is the now-state at the end of the last scene."
+        "Continue this scene from here. Do not write an offstage person as having walked in. "
+        "Do not change a clock already in clocks to another hour or another phrase for the same hour. "
+        "Do not change a measure already in measures to another number. "
+        "When day_relation=same_day, do not write something that just happened last scene as yesterday just / yesterday's new. "
+        "When day_relation=next_day, yesterday may refer to the last scene. "
+        "What already happened still follows established_facts / chapter_summary. "
+        "Writing this backwards is a content failure."
     )
 
 
 def _is_offstage(text: str) -> bool:
-    return any(marker in text for marker in OFFSTAGE_MARKERS)
+    low = text.lower()
+    return any(marker in low for marker in OFFSTAGE_MARKERS)
 
 
 def _field_strings(state, *keys):
@@ -184,10 +167,11 @@ def _field_strings(state, *keys):
 
 def _scan_phrases(text, phrases):
     hits = []
+    source = text.lower()
     index = 0
-    while index < len(text):
+    while index < len(source):
         for phrase in phrases:
-            if text.startswith(phrase, index):
+            if source.startswith(phrase, index):
                 hits.append(phrase)
                 index += len(phrase)
                 break
@@ -225,9 +209,10 @@ def extract_world_measures(state) -> list:
 def extract_day_relation(time_context) -> str:
     if not isinstance(time_context, str):
         return ""
-    if any(marker in time_context for marker in DAY_NEXT_MARKERS):
+    low = time_context.lower()
+    if any(marker in low for marker in DAY_NEXT_MARKERS):
         return "next_day"
-    if any(marker in time_context for marker in DAY_SAME_MARKERS):
+    if any(marker in low for marker in DAY_SAME_MARKERS):
         return "same_day"
     return ""
 
@@ -258,13 +243,14 @@ def build_world_state(state=None) -> dict:
 def is_irreversible_fact(text) -> bool:
     if not isinstance(text, str) or is_scene_absence(text):
         return False
-    if "提出" in text and "进入" in text:
+    source = text.lower()
+    if "proposed" in source and "enter" in source:
         return False
     index = 0
-    while index < len(text):
+    while index < len(source):
         for marker in IRREVERSIBLE_MARKERS:
-            if text.startswith(marker, index):
-                window = text[max(0, index - IRREVERSIBLE_LOOKBEHIND):index]
+            if source.startswith(marker, index):
+                window = source[max(0, index - IRREVERSIBLE_LOOKBEHIND):index]
                 if any(negation in window for negation in IRREVERSIBLE_NEGATION):
                     index += len(marker)
                     break
@@ -277,7 +263,8 @@ def is_irreversible_fact(text) -> bool:
 def is_scene_absence(text) -> bool:
     if not isinstance(text, str):
         return False
-    return any(phrase in text for phrase in ESTABLISHED_NEGATIONS + SCENE_ABSENCE_EXTRA)
+    low = text.lower()
+    return any(phrase in low for phrase in ESTABLISHED_NEGATIONS + SCENE_ABSENCE_EXTRA)
 
 
 def present_scene_state(state) -> dict:
@@ -391,7 +378,7 @@ def _render_chapter_summary(groups, line_cap) -> str:
         body = "；".join(_chapter_kept_lines(texts))
         if len(body) > line_cap:
             body = _clip_summary_segment(body, line_cap)
-        parts.append(f"第{chapter}章：" + body)
+        parts.append(f"Chapter {chapter}: " + body)
     return " / ".join(parts)
 
 
@@ -425,7 +412,7 @@ def chapter_summary_from_dropped(dropped) -> str:
         if len(joined) <= CHAPTER_SUMMARY_CAP:
             return joined
     return " / ".join(
-        f"第{chapter}章：" + texts[0][:CHAPTER_SUMMARY_STUB_MIN]
+        f"Chapter {chapter}: " + texts[0][:CHAPTER_SUMMARY_STUB_MIN]
         for chapter, texts in groups
     )
 
@@ -506,15 +493,16 @@ def _excerpt(text: str, start: int, end: int) -> str:
 
 
 def _scene_scoped(text: str, start: int) -> bool:
-    window = text[max(0, start - ESTABLISHED_NEGATION_LOOKBEHIND):start]
+    window = text[max(0, start - ESTABLISHED_NEGATION_LOOKBEHIND):start].lower()
     return any(marker in window for marker in SCENE_SCOPED_MARKERS)
 
 
 def _first_negation_conflict(text: str) -> dict | None:
+    source = text.lower()
     index = 0
-    while index < len(text):
+    while index < len(source):
         for phrase in ESTABLISHED_NEGATIONS:
-            if text.startswith(phrase, index):
+            if source.startswith(phrase, index):
                 if not _scene_scoped(text, index):
                     return {
                         "kind": "established_negation",
@@ -560,17 +548,24 @@ def _world_list(world_state, key):
 
 
 def _clock_hour(phrase: str) -> str:
-    if len(phrase) >= 2 and phrase[0] in CLOCK_HOURS and phrase[1] == "时":
-        return phrase[:2]
-    return phrase
+    if not isinstance(phrase, str):
+        return ""
+    low = phrase.lower().strip()
+    if low in ("noon", "midnight"):
+        return low
+    for hour in list(CLOCK_HOUR_NUMS) + list(CLOCK_HOUR_WORDS):
+        if low.startswith(hour + " "):
+            return hour
+    return low
 
 
 def _scan_phrase_hits(text, phrases):
     hits = []
+    source = text.lower()
     index = 0
-    while index < len(text):
+    while index < len(source):
         for phrase in phrases:
-            if text.startswith(phrase, index):
+            if source.startswith(phrase, index):
                 hits.append((index, phrase))
                 index += len(phrase)
                 break
@@ -629,7 +624,8 @@ def _offstage_name(item):
         return None
     index = min(pos for pos, _sep in marks)
     name = item[:index].strip()
-    if 1 <= len(name) <= 4:
+    words = name.split()
+    if 1 <= len(words) <= 4 and 2 <= len(name) <= 32:
         return name
     return None
 
@@ -644,7 +640,7 @@ def _offstage_arrival_conflict(text, offstage):
             index = text.find(name, start)
             if index < 0:
                 break
-            window = text[index + len(name):index + len(name) + OFFSTAGE_ARRIVAL_LOOKAHEAD]
+            window = text[index + len(name):index + len(name) + OFFSTAGE_ARRIVAL_LOOKAHEAD].lower()
             for arrival in OFFSTAGE_ARRIVAL:
                 found_at = window.find(arrival)
                 if found_at >= 0:

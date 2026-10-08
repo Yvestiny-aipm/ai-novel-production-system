@@ -1,11 +1,11 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>创作工作台</title>
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Writing workbench</title>
 <style>body{font:16px system-ui;max-width:960px;margin:2rem auto;color:#222}button{margin:.25rem;padding:.5rem 1rem}.card{border:1px solid #ddd;border-radius:8px;padding:1rem;margin:1rem 0}pre{white-space:pre-wrap;background:#f6f6f6;padding:1rem}</style>
-<h1>创作工作台</h1><p>统一后端任务状态与结果查看</p>
-<div class="card"><label>任务 ID <input id="task" placeholder="task_id"></label><button onclick="loadTask()">查询状态</button><div id="state">尚未查询</div></div>
-<div class="card"><button onclick="action('pause')">暂停</button><button onclick="action('resume')">恢复</button><button onclick="action('retry_planning')">重新规划</button><button onclick="action('retry_writing')">重新生文</button><button onclick="action('cancel')">取消</button><input id="reason" placeholder="操作原因"></div>
-<div class="card"><h2>正文 / 审查 / 记忆</h2><p>结果由统一后端按场次和版本接口提供。</p><pre id="result">请先查询任务</pre></div>
+<h1>Writing workbench</h1><p>Unified backend task status and results</p>
+<div class="card"><label>Task ID <input id="task" placeholder="task_id"></label><button onclick="loadTask()">Load status</button><div id="state">Not loaded</div></div>
+<div class="card"><button onclick="action('pause')">Pause</button><button onclick="action('resume')">Resume</button><button onclick="action('retry_planning')">Retry planning</button><button onclick="action('retry_writing')">Retry writing</button><button onclick="action('cancel')">Cancel</button><input id="reason" placeholder="Action reason"></div>
+<div class="card"><h2>Prose / review / memory</h2><p>Results come from the unified backend scene and version APIs.</p><pre id="result">Load a task first</pre></div>
 <script>
 let current;
-async function loadTask(){const id=document.querySelector('#task').value;if(!id)return;const r=await fetch('/api/v1/tasks/'+encodeURIComponent(id));const j=await r.json();if(j.error){state.textContent=j.error.message;return}current=j.data;const node=current.status==='completed'?`已完成（最后节点：${current.current_node}）`:current.current_node;state.textContent=`${node} · ${current.status} · 下一步：${current.next_action} · 状态版本 ${current.state_version}`;result.textContent=JSON.stringify(current,null,2)}
-async function action(name){if(!current)return alert('请先查询任务');const r=await fetch('/api/v1/tasks/'+encodeURIComponent(current.task_id)+'/actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:name,expected_state_version:current.state_version,reason:document.querySelector('#reason').value})});const j=await r.json();if(j.error)alert(j.error.message);else{current=j.data;loadTask()}}
+async function loadTask(){const id=document.querySelector('#task').value;if(!id)return;const r=await fetch('/api/v1/tasks/'+encodeURIComponent(id));const j=await r.json();if(j.error){state.textContent=j.error.message;return}current=j.data;const node=current.status==='completed'?`completed (last node: ${current.current_node})`:current.current_node;state.textContent=`${node} · ${current.status} · next: ${current.next_action} · state version ${current.state_version}`;result.textContent=JSON.stringify(current,null,2)}
+async function action(name){if(!current)return alert('Load a task first');const r=await fetch('/api/v1/tasks/'+encodeURIComponent(current.task_id)+'/actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:name,expected_state_version:current.state_version,reason:document.querySelector('#reason').value})});const j=await r.json();if(j.error)alert(j.error.message);else{current=j.data;loadTask()}}
 </script></html>

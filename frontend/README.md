@@ -1,5 +1,5 @@
-# 创作工作台（阶段 9）
+# Writing workbench (phase 9)
 
-这是第一版静态工作台原型。它只通过统一后端 REST API 查询和操作任务，不直接访问 Agent、Harness 或数据库。本地一键启动 `./scripts/dev_up.sh` 会在同一端口提供页面和 `/api`。单独部署时将静态文件挂载到前端服务器，并把 `/api` 代理到后端。
+This is the first-version static workbench. It only queries and operates tasks through the unified backend REST API. It does not talk to Agents, Harness, or the database directly. Local `./scripts/dev_up.sh` serves the page and `/api` on the same port. For a separate deploy, host the static files and proxy `/api` to the backend.
 
-当前覆盖：任务状态查询、暂停、恢复、重新规划、重新生文和取消；正文、审查报告和记忆提案沿用后端查询接口，后续补充列表和版本视图。
+Current coverage: task status, pause, resume, retry planning, retry writing, and cancel. Prose, review reports, and memory proposals reuse backend query APIs. Lists and version views come later.

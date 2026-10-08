@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import memory_proposal, reviewer_result, scene_plan, words
 
 from backend.character_canon import (CHARACTER_CANON_REASON, CHARACTER_CANON_RULE,
     character_canon_instruction, character_canon_snapshot, validate_character_canon)
@@ -13,17 +14,16 @@ from integration.run_real_test import run, save_draft, save_plan
 from integration.seed_real_test import seed
 
 
-# Real 20_k / 40_a sentences, copied out. Tests never open historical DBs.
-SCENE14_TA = "林照把油布包放在桌上，没有坐下。他扫了一圈，目光落在桌角那摞册子上。"
-SCENE18_SISTER = "“守灯的。”他重复了一遍，语气没有变化，“塔上的人都这么叫。你姐姐也这么叫。”"
-SCENE40A_HANDOFF = "要铜牌。林照把铜牌递过去，他只看编号那一行，指腹压住"
-SCENE40A_WATCHMAN = "林照站起来，膝盖有些僵。她看着守夜人把晶片放回带编号的浅格。浅格在墙侧一排小抽屉里，他拉开其中一格"
-SCENE40B_ENTER = "着门口。林照进来时，他正用一块软布擦光面边缘，"
-SCENE10_SHE = "林照的鞋底陷进湿沙半寸，她停住，没有继续往岸上走。"
-SCENE5_MEIMEI = "林照的手停在结上。红线下方的双结是妹妹林澜留下的，左手使力，收尾偏左。"
-SCENE14_CHEN = "林照把油布包按在胸口，涉水往回走。老陈在前面带路，步子比来时快，水没过膝盖时他回头看了一眼，确认林照没停。"
-CHEN_TA = "老陈说他不敢把这一页留下。"
-TEAR_TA = "“他让我撕，我就撕了。”老陈的喉结动了一下"
+SCENE14_TA = "Lin Zhao set the oilcloth bundle on the table and did not sit. He scanned the room, eyes on the stack at the corner."
+SCENE18_SISTER = '"The lamp keeper," he repeated, unchanged. "Everyone on the tower says that. Your older sister said it too."'
+SCENE40A_HANDOFF = "Need the brass plate. Lin Zhao handed it over, and he only checked the number line."
+SCENE40A_WATCHMAN = "Lin Zhao stood, knees stiff. She watched the night watchman put the chip back in the numbered slot. He opened one drawer."
+SCENE40B_ENTER = "Lin Zhao at the door. When she came in, he was wiping the bright edge with a soft cloth."
+SCENE10_SHE = "Lin Zhao's soles sank into the wet sand. She stopped and did not walk farther up the shore."
+SCENE5_MEIMEI = "Lin Zhao's hand stopped on the knot. The double knot below the red thread was left by her younger sister Lin Lan."
+SCENE14_CHEN = "Lin Zhao held the bundle to her chest and waded back. Old Chen led the way. When the water reached his knees he looked back to be sure Lin Zhao had not stopped."
+CHEN_TA = "Old Chen said he did not dare leave that page."
+TEAR_TA = '"He told me to tear it, so I tore it." Old Chen swallowed.'
 
 
 def expect(text, *, ok):
@@ -46,57 +46,52 @@ expect(SCENE5_MEIMEI, ok=True)
 expect(CHEN_TA, ok=True)
 expect(TEAR_TA, ok=True)
 expect(SCENE14_CHEN, ok=True)
-expect("林照没拦他，只把铜牌收回油布包。", ok=True)
-expect("林照回头，看见一个五十来岁的男人。他脸上没什么表情。", ok=True)
-expect("林照走到他侧面。老人这才抬起头。他年纪很大了。", ok=True)
-expect("林照走到他侧面，把册子递到他面前。", ok=True)
-expect("一个老人正弯着腰。他听见脚步声。", ok=True)
-expect("林照看见一个老人正弯着腰。他听见脚步声。", ok=True)
-expect("“门自己关上？”林照问。\n\n“风。”他说，但说得很轻", ok=True)
-expect("“门自己关上？”林照问。\n\n“风。”他说，但说得很轻，像自己也不信。他把麻袋甩上肩", ok=True)
+expect("Lin Zhao did not stop him. She put the brass plate back in the bundle.", ok=True)
+expect("Lin Zhao turned and saw a man about fifty. He had little expression.", ok=True)
+expect("Lin Zhao walked to his side. The old man raised his head. He was very old.", ok=True)
+expect("Lin Zhao walked to his side and held the register out to him.", ok=True)
+expect("An old man was bent over. He heard footsteps.", ok=True)
+expect("Lin Zhao saw an old man bent over. He heard footsteps.", ok=True)
+expect('"Did the door close by itself?" Lin Zhao asked.\n\n"Wind," he said, very softly', ok=True)
 expect(SCENE40A_HANDOFF, ok=True)
 expect(SCENE40A_WATCHMAN, ok=True)
-expect("林照把名册交给对方，他只核对编号。", ok=True)
-expect("林照把匣子递上，他双手接住。", ok=True)
+expect("Lin Zhao gave the register to the other person, and he only checked the number.", ok=True)
+expect("Lin Zhao handed it over, and he caught it with both hands.", ok=True)
 expect(SCENE40B_ENTER, ok=True)
-expect("林照进门时，他已经站在调取台前", ok=True)
-expect("当着林照的面，在册上写下执行结论。他写一行", ok=True)
-expect("他提灯送林照下塔，一路无话。到了塔底，他从衣袋里取出", ok=True)
-expect("林照盯着那行字，等他往下念。他没有停", ok=True)
-expect("林照问下一轮是否仍带小本子上塔，他答照旧", ok=True)
-expect("周守礼。林照没有再翻原册。她在本子上把要问的事按顺序编好号：条目是谁写的，什么时候写的，起始时刻从哪里来，他亲眼看见了什么。", ok=True)
-expect("林照问他当夜有没有走进便道查看，他答得很干脆：“没有。", ok=True)
-expect("林照又让他看上下相邻两条，他认出上一条也是自己写的", ok=True)
-expect("林照把他的回答复述了一遍：条目是他当晚所写；他亲眼看见入口处已有一段围", ok=True)
-expect("林照改正，请他在口述栏旁签名。他签了", ok=True)
-expect("林照看见周守礼在岗上。她问完，他点头", ok=True)
-expect("林照找到梁敏。他没有抬头", ok=True)
-expect("林照高高兴兴地坐下。他扫了一圈", ok=False)
-expect("林照想起林澜还在镇上。他扫了一圈", ok=False)
+expect("When she came in, he was already at the retrieval desk.", ok=True)
+expect("In front of Lin Zhao, he wrote a line in the register.", ok=True)
+expect("He carried a lamp and walked Lin Zhao down the tower. At the base he took a scrap from his coat.", ok=True)
+expect("Lin Zhao watched the line, waiting for him to read on. He did not stop.", ok=True)
+expect("Lin Zhao asked whether the next round still took the small book up the tower. He answered as before.", ok=True)
+expect("Zhou Shouli. Lin Zhao did not open the original register again. She numbered the questions. He had seen what with his own eyes.", ok=True)
+expect("Lin Zhao asked him if he had walked the side path that night. He answered at once: no.", ok=True)
+expect("Lin Zhao found Liang Min. He did not look up.", ok=True)
+expect("Lin Zhao sat down happily. He scanned the room.", ok=False)
+expect("Lin Zhao thought of Lin Lan still in town. He scanned the room.", ok=False)
+expect("林照把油布包放在桌上，没有坐下。他扫了一圈", ok=True)
 
 su_wan = {
     "canon_version": 1,
     "rule": CHARACTER_CANON_RULE,
-    "characters": [{"name": "苏晚", "gender": "female", "pronoun": "她"}],
-    "male_others": ["老人", "男人", "老头"],
+    "characters": [{"name": "Su Wan", "gender": "female", "pronoun": "she"}],
+    "male_others": ["old man", "man"],
 }
-assert validate_character_canon("苏晚把包放在桌上，没有坐下。他扫了一圈", su_wan)["status"] == "failed"
-assert validate_character_canon("当着苏晚的面，在册上写下结论。他写一行", su_wan)["status"] == "passed"
-assert validate_character_canon("送苏晚到门口，他转身关门", su_wan)["status"] == "passed"
+assert validate_character_canon("Su Wan set the bundle on the table and did not sit. He scanned the room.", su_wan)["status"] == "failed"
+assert validate_character_canon("In front of Su Wan, he wrote a line.", su_wan)["status"] == "passed"
+assert validate_character_canon("sent Su Wan to the door, and he turned to close it", su_wan)["status"] == "passed"
 su_instruction = character_canon_instruction(su_wan)
-assert "苏晚是女性，代词用她，不得用他承接苏晚" in su_instruction
-assert "林照" not in su_instruction
+assert "Su Wan is female. Use she. Do not use He to continue Su Wan." in su_instruction
+assert "Lin Zhao" not in su_instruction
 
 canon = character_canon_snapshot()
 assert canon["canon_version"] == 1
 assert canon["rule"] == CHARACTER_CANON_RULE
 names = {item["name"]: item for item in canon["characters"]}
-assert names["林照"]["gender"] == "female" and names["林照"]["pronoun"] == "她"
-assert names["林照"]["kinship"]["林澜"] == "妹妹"
-assert names["林澜"]["relation"] == "林照的妹妹"
-assert "老陈" not in names and "守灯的" not in names and "守夜人" not in names
-assert canon["male_others"] == ["老陈", "守灯的", "守夜人", "老人", "男人", "老头"]
-assert "守夜人" in canon["male_others"]
+assert names["Lin Zhao"]["gender"] == "female" and names["Lin Zhao"]["pronoun"] == "she"
+assert names["Lin Zhao"]["kinship"]["Lin Lan"] == "younger sister"
+assert names["Lin Lan"]["relation"] == "Lin Zhao's younger sister"
+assert "Old Chen" not in names
+assert canon["male_others"] == ["Old Chen", "the lamp keeper", "the night watchman"]
 
 for instruction in (
     character_canon_instruction(),
@@ -105,11 +100,11 @@ for instruction in (
     reviewer_world_instruction(),
 ):
     assert "character_canon" in instruction
-    assert "禁止写反" in instruction
-    assert "妹妹" in instruction
-    assert "守夜人是男性，他不指林照" in instruction
-    assert "换指前先写出被指的人" in instruction
-    assert "容易混时用名字" in instruction
+    assert "Do not reverse them" in instruction
+    assert "younger sister" in instruction
+    assert "the night watchman is male. He does not refer to Lin Zhao" in instruction
+    assert "Name the person before switching reference" in instruction
+    assert "use names" in instruction
 
 
 with tempfile.TemporaryDirectory() as directory:
@@ -127,20 +122,12 @@ with tempfile.TemporaryDirectory() as directory:
     )
     assert pack["character_canon"] == character_canon_snapshot(version=1)
     assert pack["previous_scene_state"]["characters"] == ["林照改称他"]
-    assert pack["character_canon"]["characters"][0]["pronoun"] == "她"
+    assert pack["character_canon"]["characters"][0]["pronoun"] == "she"
     db.close()
 
 
 def plan(number):
-    return {"contract_type": "ScenePlan", "contract_version": "v1", "payload": {
-        "scene_goal": f"场次{number}推进", "entrance_state": {"before": number}, "exit_state": {"after": number},
-        "characters": ["林照"], "location": "灯塔档案室", "time_context": "夜晚", "conflict": "调查",
-        "action_beats": ["查阅档案"], "must_happen": ["发现线索"], "must_not_happen": ["谜团解决"],
-        "knowledge_boundary": "灯塔只能保存记忆", "target_word_count": 1250,
-        "acceptance_criteria": ["推进调查"], "validation_result": {"complete": True}, "ready_for_writing": True,
-        "progression_requirements": [{"progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-                                      "expected_after_state": "发现线索", "acceptance_criterion": "正文出现线索"}],
-    }}
+    return scene_plan(number)
 
 
 def prose(text):
@@ -150,17 +137,8 @@ def prose(text):
     }}
 
 
-def reviewer(role):
-    return {"contract_type": "ReviewerResult", "contract_version": "v1", "payload": {
-        "reviewer_role": role, "result": "passed", "findings": [], "suggestions": [], "issue_count": 0,
-        "severity": "ordinary", "impact_scope": "local", "true_conflict_candidate": False,
-        "scene_state": {"characters": ["林照"], "location": "灯塔档案室", "time_context": "夜晚",
-                        "events": ["发现线索"], "relationship_changes": [], "unresolved_threads": ["林澜失踪"]},
-        "progression_assessment": {"status": "achieved", "achieved_items": [{
-            "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-            "after_state": "发现线索", "evidence_text": "潮", "evidence_location": "draft.text",
-        }], "missing_items": [], "evidence": "潮"},
-    }}
+def reviewer(role, number=1):
+    return reviewer_result(role, number=number)
 
 
 class CanonDraftAdapter:
@@ -174,24 +152,24 @@ class CanonDraftAdapter:
         if role == "planning":
             return plan(number)
         if role == "writing":
-            return prose(self.texts.pop(0) if self.texts else SCENE10_SHE + SCENE5_MEIMEI + "潮" * 1000)
+            return prose(self.texts.pop(0) if self.texts else words(1000, lead=SCENE10_SHE + " " + SCENE5_MEIMEI + " word", token="beta"))
         if role == "memory_extraction":
             return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
                 "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-                "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+                "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
                 "evidence_location": "draft.payload.text", "change_reason": "审查通过", "conflict_status": "none",
                 "write_policy": "human_confirmation", "status": "pending",
             }}
         return reviewer({
             "review_world": "world_consistency", "review_plot": "character_plot",
             "review_style": "language_experience",
-        }[role])
+        }[role], number)
 
 
 def confirm_scene1(db, book):
     scene, chapter = book + "_scene_1", book + "_chapter_1"
     save_plan(db, book, chapter, scene, plan(1), "hc_p1")
-    save_draft(db, book, chapter, scene, prose("潮" * 1000), "hc_d1")
+    save_draft(db, book, chapter, scene, prose(words(1000)), "hc_d1")
     db.execute("insert into quality_reports values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
         scene + "_report_v1", book, chapter, scene, scene + "_draft_v1", "h", 1, "completed", "[]",
         0, 0, 0, 0, 0, "complete",
@@ -203,8 +181,8 @@ def confirm_scene1(db, book):
     db.commit()
 
 
-failing = SCENE14_TA + "潮" * 1000
-passing = SCENE10_SHE + SCENE5_MEIMEI + "潮" * 1000
+failing = words(1000, lead=SCENE14_TA, token="alpha")
+passing = words(1000, lead=SCENE10_SHE + " " + SCENE5_MEIMEI + " word", token="beta")
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "canon-fail.db"
     db, book = seed(path)
@@ -221,7 +199,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert roles.count("writing") == 2
     assert any(role.startswith("review_") for role in roles)
     planning = next(call for call in adapter.calls if call["task_type"] == "planning")
-    assert planning["input"]["context_pack"]["character_canon"]["characters"][0]["pronoun"] == "她"
+    assert planning["input"]["context_pack"]["character_canon"]["characters"][0]["pronoun"] == "she"
     assert planning["input"]["context_pack"]["character_canon"] != planning["input"]["context_pack"]["previous_scene_state"]
     db = sqlite3.connect(path)
     reasons = [row[0] for row in db.execute(

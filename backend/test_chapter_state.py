@@ -25,15 +25,15 @@ assert empty["destination"] == ""
 assert empty["previous_destination"] == ""
 assert empty["previous_end_location"] == ""
 assert build_chapter_state(None) == empty
-assert build_chapter_state("脏") == empty
-assert build_chapter_state({"destination": "南码头登记处"})["destination"] == "南码头登记处"
-assert build_chapter_state({"destination": "南码头登记处"})["chapter_number"] == 0
+assert build_chapter_state("dirty") == empty
+assert build_chapter_state({"destination": "South Dock registry"})["destination"] == "South Dock registry"
+assert build_chapter_state({"destination": "South Dock registry"})["chapter_number"] == 0
 
 planning = planning_progression_instruction()
 assert "chapter_state" in planning
 assert "chapter_destination" in planning
 assert "previous_destination" in planning
-assert "不得照抄" in planning
+assert "Do not copy previous_destination" in planning
 chapter_text = chapter_state_instruction()
 assert "chapter_state" in chapter_text
 assert "林照" not in chapter_text
@@ -60,24 +60,24 @@ old_plan = {
         "scene_goal": "goal",
         "entrance_state": {"x": 1},
         "exit_state": {"x": 2},
-        "characters": ["在场的人"],
-        "location": "北仓内侧",
-        "time_context": "夜晚",
-        "conflict": "调查",
-        "action_beats": ["进入"],
-        "must_happen": ["发现"],
-        "must_not_happen": ["解决"],
-        "knowledge_boundary": "已知",
+        "characters": ["people onstage"],
+        "location": "North Warehouse inner aisle",
+        "time_context": "night",
+        "conflict": "investigation",
+        "action_beats": ["enter"],
+        "must_happen": ["find"],
+        "must_not_happen": ["solve"],
+        "knowledge_boundary": "known",
         "target_word_count": 1250,
-        "acceptance_criteria": ["有效"],
+        "acceptance_criteria": ["valid"],
         "validation_result": {"ok": True},
         "ready_for_writing": True,
         "progression_requirements": [{
             "progress_type": "new_clue",
-            "target_key": "编号",
-            "before_state": "未知",
-            "expected_after_state": "获得线索",
-            "acceptance_criterion": "正文出现新线索",
+            "target_key": "number",
+            "before_state": "unknown",
+            "expected_after_state": "got a clue",
+            "acceptance_criterion": "the prose shows a new clue",
         }],
     },
 }
@@ -91,7 +91,7 @@ def assemble_pack(db, scene_id="s", chapter_id="c", **kwargs):
         pack_id=f"p_{scene_id}", book_id="b", chapter_id=chapter_id, scene_id=scene_id, version=1,
         target_agent="planning", target_node="planning", brief_version=1, plan_version=1,
         story_state_version=1, canon_version=1, sources=[],
-        previous_scene_state={"characters": ["在场的人"]},
+        previous_scene_state={"characters": ["people onstage"]},
         **kwargs,
     )
 
@@ -103,8 +103,8 @@ def add_scene(db, scene, chapter, number):
     )
 
 
-def add_plan(db, scene, chapter, destination=None, goal="推进"):
-    payload = {"scene_goal": goal, "must_happen": ["推进"]}
+def add_plan(db, scene, chapter, destination=None, goal="advance"):
+    payload = {"scene_goal": goal, "must_happen": ["advance"]}
     if destination is not None:
         payload["chapter_destination"] = destination
     db.execute(
@@ -125,14 +125,14 @@ def add_passed(db, scene, chapter, location):
         "insert into quality_reports values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (f"{scene}_r1", "b", chapter, scene, draft, "h", 1, "completed", "[]",
          0, 0, 0, 0, 0, "complete",
-         json.dumps({"location": location, "events": ["推进"]}, ensure_ascii=False),
+         json.dumps({"location": location, "events": ["advance"]}, ensure_ascii=False),
          "passed", "2026"),
     )
 
 
-DEST_NORTH = "拿到北仓第二排货架的编号"
-DEST_DOCK = "转到南码头登记处核对"
-NORTH_LOCATION = "北仓内侧与第二排货架"
+DEST_NORTH = "get the number on North Warehouse second shelf"
+DEST_DOCK = "go to South Dock registry to check"
+NORTH_LOCATION = "North Warehouse inner aisle and the second shelf"
 
 with tempfile.TemporaryDirectory() as directory:
     db = sqlite3.connect(Path(directory) / "five.db")
@@ -185,8 +185,8 @@ with tempfile.TemporaryDirectory() as directory:
     assert open_two["is_chapter_open"] is True
     assert open_two["is_chapter_close"] is False
     assert open_two["destination"] == ""
-    assert "北仓第二排" in open_two["previous_destination"]
-    assert "北仓内侧" in open_two["previous_end_location"]
+    assert "North Warehouse second shelf" in open_two["previous_destination"]
+    assert "North Warehouse inner aisle" in open_two["previous_end_location"]
     assert "旧堤" not in json.dumps(open_two, ensure_ascii=False)
     assert "灯塔" not in json.dumps(open_two, ensure_ascii=False)
     close_two = build_chapter_state(load_chapter_context(db, "b", "s4"))
@@ -211,7 +211,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert pack["chapter_state"]["destination"] == ""
     assert pack["chapter_state"]["previous_destination"] == ""
     assert pack["pacing_state"]["same_location_run"] == 0
-    assert pack["world_state"]["present"] == ["在场的人"]
+    assert pack["world_state"]["present"] == ["people onstage"]
     assert pack["established_facts"]["facts"] == []
     injected = {
         "chapter_number": 2,
@@ -227,7 +227,7 @@ with tempfile.TemporaryDirectory() as directory:
         pack_id="p_override", book_id="b", chapter_id="c", scene_id="s", version=2,
         target_agent="planning", target_node="planning", brief_version=1, plan_version=1,
         story_state_version=1, canon_version=1, sources=[],
-        previous_scene_state={"characters": ["在场的人"]},
+        previous_scene_state={"characters": ["people onstage"]},
         chapter_context=injected,
     )
     assert override["chapter_state"] == build_chapter_state(injected)

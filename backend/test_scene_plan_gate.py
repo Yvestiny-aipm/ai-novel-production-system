@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import words
 
 from backend.harness import PLANNING_PROMPT_VERSION, classify_scene_plan_quality
 from backend.siliconflow import ModelResponseParseError, contract_system_prompt, planning_progression_instruction
@@ -26,7 +27,7 @@ assert '2000' in prompt and '1000' in prompt and '1500' in prompt
 assert 'progression_baseline' in prompt
 assert 'payload top level' in prompt
 assert PLANNING_PROMPT_VERSION == 'planning_progression_v4'
-assert '顶层独立出现' in planning_progression_instruction()
+assert 'independently at the payload top level' in planning_progression_instruction()
 for field in ('characters', 'location', 'time_context'):
     payload = dict(base)
     del payload[field]
@@ -56,7 +57,7 @@ def plan(number, target=1250):
 
 def prose():
     return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
-        "text": "潮" * 1000, "word_count": 1250, "target_word_count": 1250,
+        "text": words(1000), "word_count": 1250, "target_word_count": 1250,
         "complete": True, "writer_self_check": {"complete": True},
     }}
 
@@ -72,15 +73,15 @@ def reviewer(role):
                         "events": ["发现线索"], "relationship_changes": [], "unresolved_threads": ["林澜失踪"]},
         "progression_assessment": {"status": "achieved", "achieved_items": [{
             "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-            "after_state": "发现线索", "evidence_text": "潮", "evidence_location": "draft.text",
-        }], "missing_items": [], "evidence": "潮"},
+            "after_state": "发现线索", "evidence_text": "word", "evidence_location": "draft.text",
+        }], "missing_items": [], "evidence": "word"},
     }}
 
 
 def memory():
     return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
         "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
         "evidence_location": "draft.payload.text", "change_reason": "审查通过", "conflict_status": "none",
         "write_policy": "human_confirmation", "status": "pending",
     }}

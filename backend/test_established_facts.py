@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import reviewer_result, scene_plan, words
 
 from backend.context_pack import ContextPackService
 from backend.established_facts import (CHAPTER_SUMMARY_CAP, ESTABLISHED_FACTS_REASON,
@@ -33,12 +34,12 @@ expect_empty(load_established_facts(None, book_id="b", before_scene_number=1))
 
 # 2 / 3 / 4. Order, skip dicts, keep earliest duplicate text.
 scenes = [
-    {"scene_id": "s1", "scene_number": 1, "events": ["先到岸边", {"dirty": True}]},
-    {"scene_id": "s2", "scene_number": 2, "events": ["进入保存层", ""]},
-    {"scene_id": "s3", "scene_number": 3, "events": ["先到岸边", "看见编号"]},
+    {"scene_id": "s1", "scene_number": 1, "events": ["reached the shore first", {"dirty": True}]},
+    {"scene_id": "s2", "scene_number": 2, "events": ["entered the Preservation tier", ""]},
+    {"scene_id": "s3", "scene_number": 3, "events": ["reached the shore first", "saw the number"]},
 ]
 fourth = build_established_facts(scenes)
-assert [item["text"] for item in fourth["facts"]] == ["先到岸边", "进入保存层", "看见编号"]
+assert [item["text"] for item in fourth["facts"]] == ["reached the shore first", "entered the Preservation tier", "saw the number"]
 assert [item["scene_number"] for item in fourth["facts"]] == [1, 2, 3]
 assert fourth["facts"][0]["scene_id"] == "s1"
 assert all(isinstance(item["text"], str) for item in fourth["facts"])
@@ -49,38 +50,38 @@ assert all(set(item) == {"scene_id", "scene_number", "text", "kind"} for item in
 # 6. Over 120 keep earliest 30 + latest 90.
 overflow = build_established_facts([{
     "scene_id": "s1", "scene_number": 1,
-    "events": [f"事件{index}" for index in range(1, 131)],
+    "events": [f"event {index}" for index in range(1, 131)],
 }])
 assert len(overflow["facts"]) == 120
-assert [item["text"] for item in overflow["facts"][:30]] == [f"事件{index}" for index in range(1, 31)]
-assert [item["text"] for item in overflow["facts"][-90:]] == [f"事件{index}" for index in range(41, 131)]
+assert [item["text"] for item in overflow["facts"][:30]] == [f"event {index}" for index in range(1, 31)]
+assert [item["text"] for item in overflow["facts"][-90:]] == [f"event {index}" for index in range(41, 131)]
 assert all(item["kind"] == "event" for item in overflow["facts"])
-assert "事件31" not in [item["text"] for item in overflow["facts"]]
-assert "事件40" not in [item["text"] for item in overflow["facts"]]
-assert "事件31" in overflow["chapter_summary"]
-assert "事件40" in overflow["chapter_summary"]
-assert "事件1" not in overflow["chapter_summary"]
-assert "事件130" not in overflow["chapter_summary"]
-assert "事件41" not in overflow["chapter_summary"]
+assert "event 31" not in [item["text"] for item in overflow["facts"]]
+assert "event 40" not in [item["text"] for item in overflow["facts"]]
+assert "event 31" in overflow["chapter_summary"]
+assert "event 40" in overflow["chapter_summary"]
+assert "event 1" not in overflow["chapter_summary"]
+assert "event 130" not in overflow["chapter_summary"]
+assert "event 41" not in overflow["chapter_summary"]
 assert len(overflow["chapter_summary"]) <= CHAPTER_SUMMARY_CAP
 
-pinned_events = [f"事件{index}" for index in range(1, 131)]
-pinned_events[49] = "进入保存层"
+pinned_events = [f"event {index}" for index in range(1, 131)]
+pinned_events[49] = "entered the Preservation tier"
 pinned = build_established_facts([{
     "scene_id": "s1", "scene_number": 1, "events": pinned_events,
 }])
 pinned_texts = [item["text"] for item in pinned["facts"]]
-assert "进入保存层" in pinned_texts
-assert next(item["kind"] for item in pinned["facts"] if item["text"] == "进入保存层") == "canon"
+assert "entered the Preservation tier" in pinned_texts
+assert next(item["kind"] for item in pinned["facts"] if item["text"] == "entered the Preservation tier") == "canon"
 assert len(pinned["facts"]) > 120
-assert pinned_texts.index("进入保存层") > 0
-assert "事件31" not in pinned_texts
-assert "进入保存层" not in [item["text"] for item in overflow["facts"]]
-assert "进入保存层" not in pinned["chapter_summary"]
+assert pinned_texts.index("entered the Preservation tier") > 0
+assert "event 31" not in pinned_texts
+assert "entered the Preservation tier" not in [item["text"] for item in overflow["facts"]]
+assert "entered the Preservation tier" not in pinned["chapter_summary"]
 
-long_a = "甲" * 800
-long_b = "乙" * 800
-long_events = [f"流水{index}" for index in range(1, 123)]
+long_a = "A" * 800
+long_b = "B" * 800
+long_events = [f"stream {index}" for index in range(1, 123)]
 long_events[30] = long_a
 long_events[31] = long_b
 long_pack = build_established_facts([{
@@ -88,17 +89,17 @@ long_pack = build_established_facts([{
 }])
 long_kept = [item["text"] for item in long_pack["facts"]]
 assert long_a not in long_kept and long_b not in long_kept
-assert "第3章" in long_pack["chapter_summary"]
-assert "甲" in long_pack["chapter_summary"] and "乙" in long_pack["chapter_summary"]
-assert long_pack["chapter_summary"].startswith("第3章：")
-assert " / " not in long_pack["chapter_summary"] or long_pack["chapter_summary"].count("第") == 1
+assert "Chapter 3" in long_pack["chapter_summary"]
+assert "A" in long_pack["chapter_summary"] and "B" in long_pack["chapter_summary"]
+assert long_pack["chapter_summary"].startswith("Chapter 3: ")
+assert " / " not in long_pack["chapter_summary"] or long_pack["chapter_summary"].count("Chapter") == 1
 assert len(long_pack["chapter_summary"]) <= CHAPTER_SUMMARY_CAP
 for text in long_kept:
     assert text not in long_pack["chapter_summary"]
 
 
 def chapter_part(summary, number):
-    prefix = f"第{number}章："
+    prefix = f"Chapter {number}: "
     for part in summary.split(" / "):
         if part.startswith(prefix):
             return part
@@ -107,56 +108,56 @@ def chapter_part(summary, number):
 
 twenty_scenes = [{
     "scene_id": "early", "scene_number": 1, "chapter_number": 99,
-    "events": [f"前{index}" for index in range(1, 31)],
+    "events": [f"early {index}" for index in range(1, 31)],
 }]
 for number in range(1, 21):
     twenty_scenes.append({
         "scene_id": f"mid{number}", "scene_number": 1 + number, "chapter_number": number,
-        "events": [f"章标记{number}档案室"],
+        "events": [f"chapter mark {number} archive"],
     })
 twenty_scenes.append({
     "scene_id": "tail", "scene_number": 22, "chapter_number": 99,
-    "events": [f"后{index}" for index in range(1, 91)],
+    "events": [f"late {index}" for index in range(1, 91)],
 })
 twenty = build_established_facts(twenty_scenes)
-assert all(f"第{number}章" in twenty["chapter_summary"] for number in range(1, 21))
-assert "章标记1" in chapter_part(twenty["chapter_summary"], 1)
+assert all(f"Chapter {number}" in twenty["chapter_summary"] for number in range(1, 21))
+assert "chapter mark 1" in chapter_part(twenty["chapter_summary"], 1)
 assert len(twenty["chapter_summary"]) <= CHAPTER_SUMMARY_CAP
 
 eighty_scenes = [{
     "scene_id": "early", "scene_number": 1, "chapter_number": 99,
-    "events": [f"前{index}" for index in range(1, 31)],
+    "events": [f"early {index}" for index in range(1, 31)],
 }]
 for number in range(1, 81):
     eighty_scenes.append({
         "scene_id": f"mid{number}", "scene_number": 1 + number, "chapter_number": number,
-        "events": [f"章标{number}" + "x" * 190],
+        "events": [f"chap mark {number} " + "x" * 190],
     })
 eighty_scenes.append({
     "scene_id": "tail", "scene_number": 82, "chapter_number": 99,
-    "events": [f"后{index}" for index in range(1, 91)],
+    "events": [f"late {index}" for index in range(1, 91)],
 })
 eighty = build_established_facts(eighty_scenes)
-assert all(f"第{number}章" in eighty["chapter_summary"] for number in range(1, 81))
-assert "章标1" in chapter_part(eighty["chapter_summary"], 1)
+assert all(f"Chapter {number}" in eighty["chapter_summary"] for number in range(1, 81))
+assert "chap mark 1" in chapter_part(eighty["chapter_summary"], 1)
 assert len(eighty["chapter_summary"]) <= CHAPTER_SUMMARY_CAP
 assert len(eighty["chapter_summary"]) <= 7200
 
-assert is_irreversible_fact("林照进入档案室并说明来意") is True
-assert is_irreversible_fact("守夜人领她进入保存层") is True
-assert is_irreversible_fact("林照在涨潮前登上记忆厅") is True
+assert is_irreversible_fact("Lin Zhao entered Archive Room and stated her purpose") is True
+assert is_irreversible_fact("the night watchman entered the Preservation tier with her") is True
+assert is_irreversible_fact("Lin Zhao climbed to Memory Hall before the tide") is True
 assert is_irreversible_fact("") is False
 assert is_irreversible_fact({"dirty": True}) is False
-assert is_irreversible_fact("本场未进入") is False
-assert is_irreversible_fact("均未进入") is False
-assert is_irreversible_fact("她没有跨过门槛") is False
-assert is_irreversible_fact("林照正式提出进入字库") is False
-assert is_irreversible_fact("提出以核对编号为名进入未成名层") is False
-assert is_irreversible_fact("表末添记未开匣") is False
-assert is_irreversible_fact("不取匣不开匣") is False
-assert is_irreversible_fact("他没有见过匣子上架") is False
-assert is_irreversible_fact("送匣人沿通路而来，脚步很轻") is False
-assert is_irreversible_fact("昨夜进入保存层，今日未进入字库") is True
+assert is_irreversible_fact("this scene did not enter") is False
+assert is_irreversible_fact("never entered") is False
+assert is_irreversible_fact("did not cross the threshold") is False
+assert is_irreversible_fact("Lin Zhao formally proposed entering Glyph Vault") is False
+assert is_irreversible_fact("proposed to enter the Unnamed tier to check numbers") is False
+assert is_irreversible_fact("the register added that the case was not opened") is False
+assert is_irreversible_fact("did not take or open the case") is False
+assert is_irreversible_fact("he has not seen the case put on the shelf") is False
+assert is_irreversible_fact("the case bearer came along the path, steps light") is False
+assert is_irreversible_fact("last night entered the Preservation tier, today did not enter Glyph Vault") is True
 
 
 instruction = established_facts_instruction()
@@ -166,7 +167,7 @@ assert "progression_baseline" in instruction
 assert "kind=canon" in instruction
 assert "chapter_summary" in instruction
 assert "context_pack.chapter_summary" in instruction
-assert "每章" in instruction
+assert "each chapter" in instruction
 assert "林照" not in instruction
 assert "灯塔" not in instruction
 assert "档案室" not in instruction
@@ -174,11 +175,11 @@ assert "established_facts" not in MEMORY_REFUSAL_RETRY_PACK_KEYS
 
 world_instruction = world_state_instruction()
 assert "world_state" in world_instruction
-assert "此刻" in world_instruction
+assert "now-state" in world_instruction
 assert "offstage" in world_instruction
 assert "clocks" in world_instruction
 assert "measures" in world_instruction
-assert "昨日" in world_instruction or "昨天" in world_instruction
+assert "yesterday" in world_instruction
 assert "林照" not in world_instruction
 assert "灯塔" not in world_instruction
 assert "档案室" not in world_instruction
@@ -187,8 +188,8 @@ assert "established_facts" in first_draft_writing_instruction()
 assert "established_facts" in planning_progression_instruction()
 assert "world_state" in first_draft_writing_instruction()
 assert "world_state" in planning_progression_instruction()
-assert "此刻" in first_draft_writing_instruction()
-assert "此刻" in planning_progression_instruction()
+assert "now-state" in first_draft_writing_instruction()
+assert "now-state" in planning_progression_instruction()
 for reviewer in (
     reviewer_world_instruction(),
     reviewer_plot_instruction(),
@@ -207,9 +208,9 @@ for reviewer in (
 
 
 LEDGER = established_facts_snapshot(facts=[
-    {"scene_id": "s1", "scene_number": 1, "text": "先到岸边"},
+    {"scene_id": "s1", "scene_number": 1, "text": "reached the shore first"},
 ])
-SAFE = "林照的鞋底陷进湿沙半寸，她停住，没有继续往岸上走。"
+SAFE = "Lin Zhao's soles sank half an inch into wet sand. She stopped and did not keep walking up the shore."
 
 
 def expect_gate(text, established_facts, *, ok, found=None):
@@ -232,25 +233,26 @@ def expect_gate(text, established_facts, *, ok, found=None):
     return result
 
 
-expect_gate("一层也没进", None, ok=True)
-expect_gate("一层也没进", established_facts_snapshot(), ok=True)
-expect_gate("从未进入", {"facts": []}, ok=True)
+expect_gate("never entered", None, ok=True)
+expect_gate("never entered", established_facts_snapshot(), ok=True)
+expect_gate("never entered", {"facts": []}, ok=True)
+expect_gate("从未进入", LEDGER, ok=True)
 
-for phrase in ("一层也没进", "从未进入", "均未进入"):
+for phrase in ("never entered", "never went in", "has never entered"):
     expect_gate(phrase, LEDGER, ok=False, found=phrase)
-expect_gate("守夜人仍未现身", LEDGER, ok=False, found="仍未现身")
+expect_gate("still has not appeared", LEDGER, ok=False, found="still has not appeared")
 
-expect_gate("本场未进入", LEDGER, ok=True)
-expect_gate("本场三层均未进入", LEDGER, ok=True)
-expect_gate("今夜仍未现身", LEDGER, ok=True)
-expect_gate("她没有跨过门槛", LEDGER, ok=True)
-expect_gate("她未跨门槛", LEDGER, ok=True)
-expect_gate("她仍未进入", LEDGER, ok=True)
-expect_gate("她未进入", LEDGER, ok=True)
+expect_gate("this scene did not enter", LEDGER, ok=True)
+expect_gate("this scene never entered the three tiers", LEDGER, ok=True)
+expect_gate("tonight still has not appeared", LEDGER, ok=True)
+expect_gate("did not cross the threshold", LEDGER, ok=True)
+expect_gate("has not crossed the threshold", LEDGER, ok=True)
+expect_gate("still has not entered", LEDGER, ok=True)
+expect_gate("she did not enter", LEDGER, ok=True)
 
 expect_gate(SAFE, LEDGER, ok=True)
-expect_gate("林照的手停在结上。红线下方的双结是妹妹林澜留下的。", LEDGER, ok=True)
-expect_gate("林照站起来，膝盖有些僵。她看着守夜人把晶片放回带编号的浅格。", LEDGER, ok=True)
+expect_gate("Lin Zhao's hand stopped on the knot. The twin knots below the red thread were left by her younger sister Lin Lan.", LEDGER, ok=True)
+expect_gate("Lin Zhao stood up, knees stiff. She watched the night watchman put the chip back in the numbered slot.", LEDGER, ok=True)
 
 
 empty_world = build_world_state()
@@ -264,58 +266,58 @@ assert empty_world["clocks"] == []
 assert empty_world["measures"] == []
 assert build_world_state(None) == empty_world
 assert build_world_state({}) == empty_world
-assert build_world_state("脏") == empty_world
+assert build_world_state("dirty") == empty_world
 
 split_world = build_world_state({
-    "location": "岸边石阶",
-    "time_context": "潮水未退，巳时未到",
-    "characters": ["她站在石阶上", "守夜人未登场", "货场的人已留在岸上，不随行", "跟着上来的人"],
+    "location": "stone steps at the shore",
+    "time_context": "tide not gone, 4 a.m. not yet",
+    "characters": ["she stood on the steps", "the night watchman has not arrived", "people at the yard stayed behind", "the person who came up"],
 })
-assert split_world["location"] == "岸边石阶"
-assert split_world["time_context"] == "潮水未退，巳时未到"
-assert split_world["present"] == ["她站在石阶上", "跟着上来的人"]
-assert split_world["offstage"] == ["守夜人未登场", "货场的人已留在岸上，不随行"]
-assert "巳时未到" in split_world["clocks"]
+assert split_world["location"] == "stone steps at the shore"
+assert split_world["time_context"] == "tide not gone, 4 a.m. not yet"
+assert split_world["present"] == ["she stood on the steps", "the person who came up"]
+assert split_world["offstage"] == ["the night watchman has not arrived", "people at the yard stayed behind"]
+assert "4 a.m." in split_world["clocks"]
 
 late = build_world_state({
-    "characters": ["林晚：不在场，其记忆仍归档", "已离开渡口", "还在门口的人"],
+    "characters": ["Lin Wan: not present, her memory still archived", "already left the ferry", "the person still at the door"],
 })
-assert "林晚：不在场，其记忆仍归档" in late["offstage"]
-assert "已离开渡口" in late["offstage"]
-assert "林晚：不在场，其记忆仍归档" not in late["present"]
-assert "还在门口的人" in late["present"]
+assert "Lin Wan: not present, her memory still archived" in late["offstage"]
+assert "already left the ferry" in late["offstage"]
+assert "Lin Wan: not present, her memory still archived" not in late["present"]
+assert "the person still at the door" in late["present"]
 
 assert build_world_state({
-    "characters": ["在场的人", {"dirty": True}, "同伴未到场", 3, "另一人未上场"],
-})["present"] == ["在场的人"]
+    "characters": ["people onstage", {"dirty": True}, "a companion did not come", 3, "another person stayed behind"],
+})["present"] == ["people onstage"]
 assert build_world_state({
-    "characters": ["在场的人", {"dirty": True}, "同伴未到场", 3, "另一人未上场"],
-})["offstage"] == ["同伴未到场", "另一人未上场"]
+    "characters": ["people onstage", {"dirty": True}, "a companion did not come", 3, "another person stayed behind"],
+})["offstage"] == ["a companion did not come", "another person stayed behind"]
 assert {"dirty": True} not in build_world_state({
-    "characters": ["在场的人", {"dirty": True}, "同伴未到场"],
+    "characters": ["people onstage", {"dirty": True}, "a companion did not come"],
 })["present"]
 assert {"dirty": True} not in build_world_state({
-    "characters": ["在场的人", {"dirty": True}, "同伴未到场"],
+    "characters": ["people onstage", {"dirty": True}, "a companion did not come"],
 })["offstage"]
-assert build_world_state({"location": {"name": "门口"}, "time_context": ["夜"]})["location"] == ""
-assert build_world_state({"location": {"name": "门口"}, "time_context": ["夜"]})["time_context"] == ""
+assert build_world_state({"location": {"name": "door"}, "time_context": ["night"]})["location"] == ""
+assert build_world_state({"location": {"name": "door"}, "time_context": ["night"]})["time_context"] == ""
 
 measured = build_world_state({
-    "events": ["绳头露出一拃半", "可见长约一指多一点"],
-    "characters": ["手里一拃的人"],
+    "events": ["the rope end showed two spans", "visible length about a finger more"],
+    "characters": ["the person with a span in hand"],
 })
-assert "一拃半" in measured["measures"]
-assert "一指多一点" in measured["measures"]
-assert "一拃" not in measured["measures"]
-assert measured["measures"] == ["一拃半", "一指多一点"]
+assert "two spans" in measured["measures"]
+assert "a finger" in measured["measures"]
+assert "a span" not in measured["measures"]
+assert measured["measures"] == ["two spans", "a finger"]
 
-assert build_world_state({"time_context": "与上一场同日，上午光斜"})["day_relation"] == "same_day"
-assert build_world_state({"time_context": "与上一场相隔一日的同一时段"})["day_relation"] == "next_day"
-assert build_world_state({"time_context": "涨潮之夜"})["day_relation"] == ""
+assert build_world_state({"time_context": "the same day as the last scene, morning light"})["day_relation"] == "same_day"
+assert build_world_state({"time_context": "the next day at the same hour"})["day_relation"] == "next_day"
+assert build_world_state({"time_context": "tide night"})["day_relation"] == ""
 
-clocks = build_world_state({"time_context": "辰时三刻后，巳时未到"})["clocks"]
-assert "辰时三刻" in clocks
-assert "巳时未到" in clocks
+clocks = build_world_state({"time_context": "after 4 a.m., 5 a.m. not yet"})["clocks"]
+assert "4 a.m." in clocks
+assert "5 a.m." in clocks
 
 
 def expect_world(text, world_state, *, ok, kind=None):
@@ -335,69 +337,70 @@ def expect_world(text, world_state, *, ok, kind=None):
     return result
 
 
-expect_world("巳时三刻到了", None, ok=True)
-expect_world("昨天新露出来", {}, ok=True)
-expect_world("巳时三刻到了", build_world_state(), ok=True)
+expect_world("4 p.m. arrived", None, ok=True)
+expect_world("yesterday's new edge", {}, ok=True)
+expect_world("4 p.m. arrived", build_world_state(), ok=True)
 
-clock_state = {"clocks": ["巳时未到"], "measures": [], "offstage": [], "day_relation": ""}
-expect_world("巳时三刻到了", clock_state, ok=False, kind="clock_rewrite")
-expect_world("午时她站到门口", clock_state, ok=True)
-expect_world("仍是巳时未到", clock_state, ok=True)
+clock_state = {"clocks": ["4 a.m."], "measures": [], "offstage": [], "day_relation": ""}
+expect_world("4 p.m. arrived", clock_state, ok=False, kind="clock_rewrite")
+expect_world("noon she stood at the door", clock_state, ok=True)
+expect_world("still 4 a.m.", clock_state, ok=True)
 
-measure_state = {"clocks": [], "measures": ["一拃半"], "offstage": [], "day_relation": ""}
-expect_world("和昨日记住的长度一样，一指多一点", measure_state, ok=False, kind="measure_rewrite")
-expect_world("可见长约一指多一点", measure_state, ok=True)
-expect_world("露出一拃半", measure_state, ok=True)
+measure_state = {"clocks": [], "measures": ["two spans"], "offstage": [], "day_relation": ""}
+expect_world("same as yesterday, a finger more", measure_state, ok=False, kind="measure_rewrite")
+expect_world("visible length about a finger more", measure_state, ok=True)
+expect_world("showed two spans", measure_state, ok=True)
 
 same_day = {"clocks": [], "measures": [], "offstage": [], "day_relation": "same_day"}
-expect_world("昨天新露出来的那条边", same_day, ok=False, kind="same_day_yesterday")
-expect_world("踩着昨天留下的旧印", same_day, ok=True)
-expect_world("昨天新露出来", {"clocks": [], "measures": [], "offstage": [], "day_relation": "next_day"}, ok=True)
+expect_world("yesterday's new edge", same_day, ok=False, kind="same_day_yesterday")
+expect_world("stepping on yesterday's old print", same_day, ok=True)
+expect_world("yesterday's new edge", {"clocks": [], "measures": [], "offstage": [], "day_relation": "next_day"}, ok=True)
 
-offstage_state = {"clocks": [], "measures": [], "offstage": ["林晚：不在场，其记忆仍归档"], "day_relation": ""}
-expect_world("林晚跟着来了", offstage_state, ok=False, kind="offstage_arrival")
-expect_world("林晚的铜牌仍在原格", offstage_state, ok=True)
+offstage_state = {"clocks": [], "measures": [], "offstage": ["Lin Wan: not present, her memory still archived"], "day_relation": ""}
+expect_world("Lin Wan walked in", offstage_state, ok=False, kind="offstage_arrival")
+expect_world("Lin Wan's brass plate still in the slot", offstage_state, ok=True)
 
 
 DIRTY_EVENTS = [
-    "进入保存层", "均未进入", "本场未进入", "一层也没进", "她没有跨过门槛",
-    "守夜人仍未现身", "门槛未跨", "她仍未进入", "先到岸边",
+    "entered the Preservation tier", "never entered", "this scene did not enter", "never went in",
+    "did not cross the threshold", "still has not appeared", "has not crossed the threshold",
+    "still has not entered", "reached the shore first",
 ]
 DIRTY_ABSENCES = [
-    "均未进入", "本场未进入", "一层也没进", "她没有跨过门槛",
-    "守夜人仍未现身", "门槛未跨", "她仍未进入",
+    "never entered", "this scene did not enter", "never went in", "did not cross the threshold",
+    "still has not appeared", "has not crossed the threshold", "still has not entered",
 ]
 DIRTY_STATE = {
-    "characters": ["林照"],
+    "characters": ["Lin Zhao"],
     "events": list(DIRTY_EVENTS),
     "relationship_changes": [],
     "unresolved_threads": [],
-    "location": "门口",
-    "time_context": "夜",
+    "location": "door",
+    "time_context": "night",
 }
 split = split_accepted_scene_state(DIRTY_STATE)
-assert split["present"]["events"] == ["进入保存层", "先到岸边"]
+assert split["present"]["events"] == ["entered the Preservation tier", "reached the shore first"]
 assert split["absences"] == DIRTY_ABSENCES
 assert "present" not in DIRTY_STATE and "absences" not in DIRTY_STATE
 
 CLEAN_STATE = {
-    "characters": ["林照"],
-    "events": ["先到岸边", "进入保存层"],
+    "characters": ["Lin Zhao"],
+    "events": ["reached the shore first", "entered the Preservation tier"],
     "relationship_changes": [],
     "unresolved_threads": [],
-    "location": "门口",
-    "time_context": "夜",
+    "location": "door",
+    "time_context": "night",
 }
 assert present_scene_state(CLEAN_STATE) == CLEAN_STATE
 assert progression_baseline_from_state(CLEAN_STATE) == CLEAN_STATE
 
-assert present_scene_state({"location": "均未进入"})["location"] == ""
-assert present_scene_state({"location": "门口"})["location"] == "门口"
-assert present_scene_state({"events": ["进入保存层", {"dirty": True}, "均未进入"]})["events"] == [
-    "进入保存层", {"dirty": True},
+assert present_scene_state({"location": "never entered"})["location"] == ""
+assert present_scene_state({"location": "door"})["location"] == "door"
+assert present_scene_state({"events": ["entered the Preservation tier", {"dirty": True}, "never entered"]})["events"] == [
+    "entered the Preservation tier", {"dirty": True},
 ]
 assert is_scene_absence({"dirty": True}) is False
-assert is_scene_absence("她未进入") is False
+assert is_scene_absence("she did not enter") is False
 
 
 def open_book(directory):
@@ -439,15 +442,15 @@ with tempfile.TemporaryDirectory() as directory:
     db = open_book(directory)
     for number in range(1, 5):
         add_scene(db, number)
-    add_report(db, 1, ["先到岸边", {"dirty": 1}])
-    add_report(db, 2, ["进入保存层"])
-    add_report(db, 3, ["先到岸边", "看见编号"])
-    add_report(db, 3, ["失败不入账"], status="failed", attempt=2)
+    add_report(db, 1, ["reached the shore first", {"dirty": 1}])
+    add_report(db, 2, ["entered the Preservation tier"])
+    add_report(db, 3, ["reached the shore first", "saw the number"])
+    add_report(db, 3, ["failed stay out"], status="failed", attempt=2)
     db.commit()
     empty = load_established_facts(db, book_id="b", before_scene_number=1)
     expect_empty(empty)
     loaded = load_established_facts(db, book_id="b", before_scene_number=4)
-    assert [item["text"] for item in loaded["facts"]] == ["先到岸边", "进入保存层", "看见编号"]
+    assert [item["text"] for item in loaded["facts"]] == ["reached the shore first", "entered the Preservation tier", "saw the number"]
     assert [item["scene_number"] for item in loaded["facts"]] == [1, 2, 3]
     db.close()
 
@@ -459,7 +462,7 @@ with tempfile.TemporaryDirectory() as directory:
     add_report(db, 1, list(DIRTY_EVENTS))
     db.commit()
     loaded = load_established_facts(db, book_id="b", before_scene_number=2)
-    assert [item["text"] for item in loaded["facts"]] == ["进入保存层", "先到岸边"]
+    assert [item["text"] for item in loaded["facts"]] == ["entered the Preservation tier", "reached the shore first"]
     assert all(item["text"] not in DIRTY_ABSENCES for item in loaded["facts"])
     stored = json.loads(db.execute(
         "select accepted_scene_state_json from quality_reports where scene_id=?", ("s1",)).fetchone()[0])
@@ -469,7 +472,7 @@ with tempfile.TemporaryDirectory() as directory:
 
 
 passed = established_facts_snapshot(facts=[
-    {"scene_id": "s1", "scene_number": 1, "text": "先到岸边"},
+    {"scene_id": "s1", "scene_number": 1, "text": "reached the shore first"},
 ])
 with tempfile.TemporaryDirectory() as directory:
     db = sqlite3.connect(Path(directory) / "pack.db")
@@ -478,7 +481,7 @@ with tempfile.TemporaryDirectory() as directory:
     db.execute("insert into chapters values ('c','b',1,null,'2026','2026')")
     db.execute("insert into scenes values ('s','b','c',4,null,null,'2026','2026')")
     db.commit()
-    previous = {"events": ["上场此刻"], "location": "门口"}
+    previous = {"events": ["last scene now"], "location": "door"}
     pack = ContextPackService(db).assemble(
         pack_id="p", book_id="b", chapter_id="c", scene_id="s", version=1,
         target_agent="planning", target_node="planning", brief_version=1, plan_version=1,
@@ -501,15 +504,7 @@ with tempfile.TemporaryDirectory() as directory:
 
 
 def plan(number):
-    return {"contract_type": "ScenePlan", "contract_version": "v1", "payload": {
-        "scene_goal": f"场次{number}推进", "entrance_state": {"before": number}, "exit_state": {"after": number},
-        "characters": ["林照"], "location": "灯塔档案室", "time_context": "夜晚", "conflict": "调查",
-        "action_beats": ["查阅档案"], "must_happen": ["发现线索"], "must_not_happen": ["谜团解决"],
-        "knowledge_boundary": "灯塔只能保存记忆", "target_word_count": 1250,
-        "acceptance_criteria": ["推进调查"], "validation_result": {"complete": True}, "ready_for_writing": True,
-        "progression_requirements": [{"progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-                                      "expected_after_state": "发现线索", "acceptance_criterion": "正文出现线索"}],
-    }}
+    return scene_plan(number)
 
 
 def prose(text):
@@ -519,17 +514,8 @@ def prose(text):
     }}
 
 
-def reviewer(role):
-    return {"contract_type": "ReviewerResult", "contract_version": "v1", "payload": {
-        "reviewer_role": role, "result": "passed", "findings": [], "suggestions": [], "issue_count": 0,
-        "severity": "ordinary", "impact_scope": "local", "true_conflict_candidate": False,
-        "scene_state": {"characters": ["林照"], "location": "灯塔档案室", "time_context": "夜晚",
-                        "events": ["发现线索"], "relationship_changes": [], "unresolved_threads": ["林澜失踪"]},
-        "progression_assessment": {"status": "achieved", "achieved_items": [{
-            "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-            "after_state": "发现线索", "evidence_text": "潮", "evidence_location": "draft.text",
-        }], "missing_items": [], "evidence": "潮"},
-    }}
+def reviewer(role, number=1):
+    return reviewer_result(role, number=number)
 
 
 class FactsDraftAdapter:
@@ -543,37 +529,37 @@ class FactsDraftAdapter:
         if role == "planning":
             return plan(number)
         if role == "writing":
-            return prose(self.texts.pop(0) if self.texts else SAFE + "潮" * 1000)
+            return prose(self.texts.pop(0) if self.texts else words(1000, lead=SAFE + " word", token="beta"))
         if role == "memory_extraction":
             return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
                 "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-                "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+                "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
                 "evidence_location": "draft.payload.text", "change_reason": "审查通过", "conflict_status": "none",
                 "write_policy": "human_confirmation", "status": "pending",
             }}
         return reviewer({
             "review_world": "world_consistency", "review_plot": "character_plot",
             "review_style": "language_experience",
-        }[role])
+        }[role], number)
 
 
-def confirm_scene1(db, book, events=None, *, location="灯塔", time_context="夜", characters=None):
+def confirm_scene1(db, book, events=None, *, location="lighthouse", time_context="night", characters=None):
     scene, chapter = book + "_scene_1", book + "_chapter_1"
     save_plan(db, book, chapter, scene, plan(1), "hc_p1")
-    save_draft(db, book, chapter, scene, prose("潮" * 1000), "hc_d1")
+    save_draft(db, book, chapter, scene, prose(words(1000)), "hc_d1")
     db.execute("insert into quality_reports values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
         scene + "_report_v1", book, chapter, scene, scene + "_draft_v1", "h", 1, "completed", "[]",
         0, 0, 0, 0, 0, "complete",
-        json.dumps({"characters": list(characters or ["林照"]), "location": location, "time_context": time_context,
-                    "events": list(events or ["调查"]), "relationship_changes": [], "unresolved_threads": []},
+        json.dumps({"characters": list(characters or ["Lin Zhao"]), "location": location, "time_context": time_context,
+                    "events": list(events or ["investigation"]), "relationship_changes": [], "unresolved_threads": []},
                    ensure_ascii=False),
         "passed", "2026"))
     db.execute("update task_states set status='completed',current_node='memory_processing' where scene_id=?", (scene,))
     db.commit()
 
 
-failing = "一层也没进" + "潮" * 1000
-passing = SAFE + "潮" * 1000
+failing = words(1000, lead="never entered", token="alpha")
+passing = words(1000, lead=SAFE + " word", token="beta")
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "facts-fail.db"
     db, book = seed(path, scene_count=2)
@@ -608,14 +594,14 @@ with tempfile.TemporaryDirectory() as directory:
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "facts-split.db"
     db, book = seed(path, scene_count=2)
-    confirm_scene1(db, book, events=["均未进入", "进入保存层"])
+    confirm_scene1(db, book, events=["never entered", "entered the Preservation tier"])
     stored = json.loads(db.execute(
         "select accepted_scene_state_json from quality_reports where scene_id=?",
         (book + "_scene_1",)).fetchone()[0])
-    assert stored["events"] == ["均未进入", "进入保存层"]
+    assert stored["events"] == ["never entered", "entered the Preservation tier"]
     assert "present" not in stored and "absences" not in stored
     db.close()
-    adapter = FactsDraftAdapter([SAFE + "潮" * 1000])
+    adapter = FactsDraftAdapter([words(1000, lead=SAFE + " word", token="beta")])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential",
                  model_environ={"REAL_TEST_SCENE_COUNT": "2"})
     scene = result["scenes"][1]
@@ -625,20 +611,20 @@ with tempfile.TemporaryDirectory() as directory:
     previous = planning["input"]["context_pack"]["previous_scene_state"]
     facts = [item["text"] for item in planning["input"]["context_pack"]["established_facts"]["facts"]]
     baseline = planning["input"]["progression_baseline"]
-    assert "均未进入" not in previous.get("events", [])
-    assert "进入保存层" in previous.get("events", [])
-    assert "均未进入" not in facts
-    assert "进入保存层" in facts
-    assert "均未进入" not in baseline.get("events", [])
-    assert "进入保存层" in baseline.get("events", [])
+    assert "never entered" not in previous.get("events", [])
+    assert "entered the Preservation tier" in previous.get("events", [])
+    assert "never entered" not in facts
+    assert "entered the Preservation tier" in facts
+    assert "never entered" not in baseline.get("events", [])
+    assert "entered the Preservation tier" in baseline.get("events", [])
 
 
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "facts-summary.db"
     db, book = seed(path, scene_count=2)
-    confirm_scene1(db, book, events=[f"事件{index}" for index in range(1, 131)])
+    confirm_scene1(db, book, events=[f"event {index}" for index in range(1, 131)])
     db.close()
-    adapter = FactsDraftAdapter([SAFE + "潮" * 1000])
+    adapter = FactsDraftAdapter([words(1000, lead=SAFE + " word", token="beta")])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential",
                  model_environ={"REAL_TEST_SCENE_COUNT": "2"})
     scene = result["scenes"][1]
@@ -646,8 +632,8 @@ with tempfile.TemporaryDirectory() as directory:
     assert scene["final_status"] == "waiting_confirmation"
     planning = next(call for call in adapter.calls if call["task_type"] == "planning")
     pack = planning["input"]["context_pack"]
-    assert "事件31" in pack["chapter_summary"]
-    assert "事件31" not in [item["text"] for item in pack["established_facts"]["facts"]]
+    assert "event 31" in pack["chapter_summary"]
+    assert "event 31" not in [item["text"] for item in pack["established_facts"]["facts"]]
     assert "chapter_summary" not in pack["established_facts"]
 
 
@@ -655,12 +641,12 @@ with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "world-state.db"
     db, book = seed(path, scene_count=2)
     confirm_scene1(
-        db, book, events=["露出一拃半"],
-        location="岸边石阶", time_context="辰时三刻后，巳时未到",
-        characters=["她站在石阶上", "守夜人未登场"],
+        db, book, events=["the rope end showed two spans"],
+        location="stone steps at the shore", time_context="after 4 a.m., 4 a.m. not yet",
+        characters=["she stood on the steps", "the night watchman has not arrived"],
     )
     db.close()
-    adapter = FactsDraftAdapter([SAFE + "潮" * 1000])
+    adapter = FactsDraftAdapter([words(1000, lead=SAFE + " word", token="beta")])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential",
                  model_environ={"REAL_TEST_SCENE_COUNT": "2"})
     scene = result["scenes"][1]
@@ -668,24 +654,27 @@ with tempfile.TemporaryDirectory() as directory:
     assert scene["final_status"] == "waiting_confirmation"
     planning = next(call for call in adapter.calls if call["task_type"] == "planning")
     pack = planning["input"]["context_pack"]
-    assert pack["previous_scene_state"]["location"] == "岸边石阶"
-    assert "巳时未到" in pack["previous_scene_state"]["time_context"]
+    assert pack["previous_scene_state"]["location"] == "stone steps at the shore"
+    assert "4 a.m." in pack["previous_scene_state"]["time_context"]
     assert pack["world_state"] == build_world_state(pack["previous_scene_state"])
-    assert pack["world_state"]["location"] == "岸边石阶"
-    assert "巳时未到" in pack["world_state"]["time_context"]
-    assert "巳时未到" in pack["world_state"]["clocks"]
-    assert "一拃半" in pack["world_state"]["measures"]
+    assert pack["world_state"]["location"] == "stone steps at the shore"
+    assert "4 a.m." in pack["world_state"]["time_context"]
+    assert "4 a.m." in pack["world_state"]["clocks"]
+    assert "two spans" in pack["world_state"]["measures"]
     assert pack["world_state"]["offstage"]
-    assert "她站在石阶上" in pack["world_state"]["present"]
-    assert "守夜人未登场" in pack["world_state"]["offstage"]
+    assert "she stood on the steps" in pack["world_state"]["present"]
+    assert "the night watchman has not arrived" in pack["world_state"]["offstage"]
 
 
 with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "world-gate.db"
     db, book = seed(path, scene_count=2)
-    confirm_scene1(db, book, events=["先到岸边"], location="岸边石阶", time_context="巳时未到")
+    confirm_scene1(db, book, events=["reached the shore first"], location="stone steps at the shore", time_context="4 a.m.")
     db.close()
-    adapter = FactsDraftAdapter(["巳时三刻到了" + "潮" * 1000, SAFE + "潮" * 1000])
+    adapter = FactsDraftAdapter([
+        words(1000, lead="4 p.m. arrived", token="alpha"),
+        words(1000, lead=SAFE + " word", token="beta"),
+    ])
     result = run(db_path=path, adapter=adapter, execution_mode="sequential",
                  model_environ={"REAL_TEST_SCENE_COUNT": "2"})
     scene = result["scenes"][1]

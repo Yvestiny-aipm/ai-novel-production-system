@@ -1,3 +1,3 @@
-# 管理后台（阶段 10）
+# Admin (phase 10)
 
-管理后台只提供系统运行管理和审计视图：用户与角色、作品访问范围、模型路由、Harness 调用记录、异常队列、任务强制控制和备份状态。管理员没有正文和正式世界规则的直接编辑入口；所有权限和写入限制必须由统一后端再次校验，页面上的 `X-Role` 不能作为安全依据。
+The admin page only provides operations and audit views: users and roles, work access scope, model routes, Harness call records, the exception queue, forced task control, and backup status. Admins have no direct edit entry for prose or approved world rules. All permission and write limits must be checked again by the unified backend. The page `X-Role` header is not a security control.

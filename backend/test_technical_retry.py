@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import words
 
 from backend.harness import Harness, ModelProfile, required_fields_validator
 from backend.model_routing import build_harness_setup
@@ -34,7 +35,7 @@ def plan(number):
 
 def prose(size=1100):
     return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
-        "text": "潮" * size, "word_count": 1250, "target_word_count": 1250,
+        "text": words(size), "word_count": 1250, "target_word_count": 1250,
         "complete": True, "writer_self_check": {"complete": True},
     }}
 
@@ -49,7 +50,7 @@ def reviewer(role):
     if role == "character_plot":
         payload["progression_assessment"] = {"status": "achieved", "achieved_items": [{
             "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-            "after_state": "发现线索", "evidence_text": "潮", "evidence_location": "draft.text",
+            "after_state": "发现线索", "evidence_text": "word", "evidence_location": "draft.text",
         }], "missing_items": []}
     return {"contract_type": "ReviewerResult", "contract_version": "v1", "payload": payload}
 
@@ -57,7 +58,7 @@ def reviewer(role):
 def memory():
     return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
         "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
         "evidence_location": "draft.payload.text", "change_reason": "审查通过",
         "conflict_status": "none", "write_policy": "human_confirmation", "status": "pending",
     }}
@@ -145,7 +146,7 @@ with tempfile.TemporaryDirectory() as directory:
                     "expected_after_state": "发现线索", "acceptance_criterion": "正文出现线索",
                 }],
             }},
-            "draft": {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {"text": "潮"}},
+            "draft": {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {"text": "word"}},
         },
         contract_type="ReviewerResult", contract_validator=required_fields_validator,
     )

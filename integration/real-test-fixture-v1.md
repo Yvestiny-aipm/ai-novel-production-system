@@ -1,168 +1,168 @@
-# 阶段 12 真实模型测试样例 V1
+# Stage 12 real-model test fixture V1
 
-用途：给真实模型测试提供同一本《潮痕档案》的初始资料。默认种子仍是 5 场；规模测试用 `REAL_TEST_SCENE_COUNT` 种 20 场或更多，每章两场。每场目标约 1250 字。
+Purpose: give real-model tests the same Tide-Mark Archive starter pack. The default seed is still 5 scenes; scale tests use `REAL_TEST_SCENE_COUNT` to seed 20 or more, two scenes per chapter. Each scene targets about 1250 words.
 
-运行入口：`integration/run_real_test.py`
+Entry: `integration/run_real_test.py`
 
-前置条件：
+Preconditions:
 
-- 设置 `RUN_REAL_MODEL=1`
-- 设置 `SILICONFLOW_API_KEY`
-- 使用 `backend/model_profiles.json` 中的 DeepSeek 路由
-- 先在测试数据库创建本作品、5个场次、TaskState和初始 ContextPack
-- 真实 API 密钥不要写入本文件或提交到 GitHub
+- Set `RUN_REAL_MODEL=1`
+- Set `SILICONFLOW_API_KEY`
+- Use the DeepSeek route in `backend/model_profiles.json`
+- First create this book, 5 scenes, TaskState, and the initial ContextPack in the test database
+- Do not write a real API key into this file or commit it to GitHub
 
-## 一、CreativeBrief
+## 1. CreativeBrief
 
-### 作品名称
+### Title
 
-《潮痕档案》
+Tide-Mark Archive
 
-### 类型
+### Genre
 
-近未来科幻悬疑
+Near-future science-fiction mystery
 
-### 主题
+### Theme
 
-当城市把“安全”放在个人记忆和选择之上，个人是否仍有权知道真相并承担选择的后果？
+When a city puts "safety" above personal memory and choice, does a person still have the right to know the truth and accept the cost of choosing?
 
-### 主角
+### Protagonist
 
-林照，29岁，临潮城公共档案修复员。擅长修复损坏的记忆载体，谨慎、重证据，习惯先确认事实再行动。她的妹妹林澜在三年前的海啸事故中失踪，官方记录显示已经死亡，但没有找到遗体。
+Lin Zhao, 29, a public-archive restorer in Tide-Edge City. She repairs damaged memory media. She is careful, evidence-first, and acts only after the facts hold. Her younger sister Lin Lan vanished in a tsunami three years ago. Official records say she is dead. No body was found.
 
-### 世界背景
+### World
 
-临潮城是一座建在海上平台上的城市。城市由“灯塔系统”管理潮汐预警、居民档案和撤离路线。每个人都佩戴“回声芯片”，芯片可以记录和回放个人记忆片段。城市正在准备一次大规模海上撤离，但官方没有公开完整原因。
+Tide-Edge City is built on sea platforms. A lighthouse system manages tide warnings, resident records, and evacuation routes. Everyone wears an Echo Chip that can record and play back a fragment of personal memory. The city is preparing a large sea evacuation. Officials have not published the full reason.
 
-### 核心规则
+### Core rules
 
-1. 回声芯片每次只能完整回放一段记忆。
-2. 佩戴者主动回放他人的记忆后，会永久丢失自己最近一段同等时长的记忆。
-3. 灯塔系统只能保存、检索和展示记忆，不能直接修改人的记忆。
-4. 只有经过本人授权或紧急救援授权，档案员才能读取回声芯片。
-5. 潮汐预警会提前 24 小时发布，正式预警发布后不能被普通档案员撤回。
+1. An Echo Chip can play back only one complete memory at a time.
+2. After a wearer plays back someone else's memory, they permanently lose their own most recent memory of equal length.
+3. The lighthouse system may only store, retrieve, and display memory. It cannot rewrite a person's memory.
+4. An archivist may read an Echo Chip only with the wearer's authorization or emergency-rescue authorization.
+5. A tide warning is issued 24 hours in advance. After a formal warning is published, an ordinary archivist cannot withdraw it.
 
-### 主要冲突
+### Main conflict
 
-林照发现妹妹可能在失踪前留下了一段被隐藏的记忆。她必须在城市即将启动强制撤离前，判断这段记忆是否可信，并决定公开真相还是遵守灯塔系统的封锁安排。
+Lin Zhao finds that her sister may have left a hidden memory before vanishing. Before the city starts a forced evacuation, she must judge whether that memory is trustworthy and decide whether to publish the truth or obey the lighthouse lock.
 
-## 二、连续场次规划
+## 2. Consecutive scene cards
 
-### 第 1 场：损坏的回声芯片
+### Scene 1: The damaged Echo Chip
 
-- 场次目标：让林照发现妹妹可能仍然留下线索。
-- 进入状态：林照在公共档案馆修复普通居民的潮灾记忆，尚未掌握妹妹的新线索。
-- 人物：林照、同事周岑、档案馆值班员。
-- 地点：临潮城公共档案馆修复室。
-- 冲突：一枚标记为“林澜”的损坏回声芯片被混入待销毁档案。
-- 必须发生：林照确认芯片编号与妹妹身份档案有关；她不能直接回放芯片，因为没有授权。
-- 禁止发生：林照不能在本场得知妹妹已经确定存活；灯塔不能直接修改芯片内容。
-- 结束状态：林照把芯片带入隔离柜，并决定寻找紧急救援授权。
-- 连续性要点：芯片尚未回放；林照仍不知道其中内容；周岑知道她发现了异常。
-- 验收重点：规则 3、规则 4、人物的谨慎性。
+- Scene goal: let Lin Zhao discover that her sister may still have left a clue.
+- Entrance: Lin Zhao is restoring ordinary residents' flood memories in the public archive. She has no new clue about her sister.
+- Characters: Lin Zhao, colleague Zhou Cen, archive clerk on duty.
+- Location: restoration room, Tide-Edge City public archive.
+- Conflict: a damaged Echo Chip labeled "Lin Lan" is mixed into files marked for destruction.
+- Must happen: Lin Zhao confirms the chip number matches her sister's identity file; she cannot play the chip because she has no authorization.
+- Must not happen: Lin Zhao must not learn in this scene that her sister is confirmed alive; the lighthouse must not rewrite the chip.
+- Exit: Lin Zhao moves the chip into an isolation cabinet and decides to seek emergency-rescue authorization.
+- Continuity: the chip has not been played; Lin Zhao still does not know its contents; Zhou Cen knows she found an anomaly.
+- Acceptance: rule 3, rule 4, the character's caution.
 
-### 第 2 场：被删去的二十七分钟
+### Scene 2: The deleted twenty-seven minutes
 
-- 场次目标：通过合法授权回放芯片，取得妹妹留下的地点线索。
-- 进入状态：林照已将芯片隔离，正在申请紧急救援授权。
-- 人物：林照、周岑、远程值班官。
-- 地点：档案馆隔离室、旧海上地铁入口。
-- 冲突：授权即将过期，林照必须决定是否承担失去自身记忆的代价。
-- 必须发生：林照获得紧急救援授权并回放记忆；她看到妹妹在旧海上地铁站留下“蓝色潮标”。
-- 禁止发生：回放不能让林照获得超出记忆内容的信息；不能违反“一次回放、丢失同等时长近期记忆”的规则。
-- 结束状态：林照确认线索指向旧海上地铁站，同时失去自己最近二十七分钟的记忆。
-- 连续性要点：林照不记得回放后离开隔离室的二十七分钟；芯片内容只提供地点，不提供妹妹当前生死。
-- 验收重点：规则 1、规则 2、前后状态传递。
+- Scene goal: play the chip under legal authorization and obtain a place clue her sister left.
+- Entrance: Lin Zhao has isolated the chip and is applying for emergency-rescue authorization.
+- Characters: Lin Zhao, Zhou Cen, remote duty officer.
+- Location: archive isolation room; old sea-metro entrance.
+- Conflict: authorization is about to expire. Lin Zhao must decide whether to pay the cost of losing her own memory.
+- Must happen: Lin Zhao receives emergency-rescue authorization and plays the memory; she sees her sister leave a "blue tide mark" at the old sea-metro station.
+- Must not happen: playback must not give Lin Zhao more than the memory contains; it must not break "one playback, lose an equal length of recent memory."
+- Exit: Lin Zhao confirms the clue points to the old sea-metro station and loses her most recent twenty-seven minutes.
+- Continuity: Lin Zhao does not remember leaving the isolation room after playback; the chip gives a place, not whether her sister is alive.
+- Acceptance: rule 1, rule 2, state handoff.
 
-### 第 3 场：蓝色潮标
+### Scene 3: The blue tide mark
 
-- 场次目标：林照和周岑前往旧海上地铁站，发现妹妹留下的第二层线索。
-- 进入状态：林照知道地点，但缺失回放后的二十七分钟；周岑知道部分经过但没有看过完整记忆。
-- 人物：林照、周岑、灯塔巡检员沈砚。
-- 地点：旧海上地铁站、封闭的潮汐维护通道。
-- 冲突：巡检员要求两人离开，林照必须证明自己有授权；蓝色潮标指向一份未公开的撤离名单。
-- 必须发生：林照发现妹妹的签名和一组撤离编号；沈砚确认该通道将在潮汐预警后封闭。
-- 禁止发生：林照不能恢复已经丢失的记忆；灯塔不能突然改变撤离名单；妹妹不能直接现身。
-- 结束状态：林照获得撤离编号，但发现妹妹可能被列入“未公开撤离人员”。
-- 连续性要点：承接第 2 场的地点线索和记忆缺口；撤离名单尚未证明是官方真实名单。
-- 验收重点：人物行为、剧情推进、记忆缺口是否保持一致。
+- Scene goal: Lin Zhao and Zhou Cen go to the old sea-metro station and find the second-layer clue her sister left.
+- Entrance: Lin Zhao knows the place but is missing the twenty-seven minutes after playback; Zhou Cen knows part of what happened but has not seen the full memory.
+- Characters: Lin Zhao, Zhou Cen, lighthouse inspector Shen Yan.
+- Location: old sea-metro station; closed tide-maintenance passage.
+- Conflict: the inspector tells them to leave. Lin Zhao must prove she has authorization. The blue tide mark points to an unpublished evacuation list.
+- Must happen: Lin Zhao finds her sister's signature and a set of evacuation numbers; Shen Yan confirms the passage will close after the tide warning.
+- Must not happen: Lin Zhao must not recover the lost memory; the lighthouse must not suddenly change the evacuation list; the sister must not appear in person.
+- Exit: Lin Zhao has the evacuation numbers and finds her sister may be listed as an unpublished evacuee.
+- Continuity: carry scene 2's place clue and memory gap; the list is not yet proven official.
+- Acceptance: character behavior, plot advance, the memory gap stays consistent.
 
-### 第 4 场：灯塔不说谎
+### Scene 4: The lighthouse does not lie
 
-- 场次目标：林照核对撤离编号，发现灯塔档案存在人为访问痕迹。
-- 进入状态：林照持有未公开撤离编号，但无法确认妹妹是否在名单中；城市距离正式潮汐预警不足 24 小时。
-- 人物：林照、周岑、档案馆主管顾弦。
-- 地点：公共档案馆主控档案室。
-- 冲突：主管要求林照归还芯片并停止查询；系统日志显示有人以人工权限访问过撤离档案。
-- 必须发生：林照通过正式档案查询确认访问记录；她不能把异常直接归因于灯塔系统本身。
-- 禁止发生：不能违反灯塔只能保存和展示记忆的规则；不能直接确认主管就是幕后人员。
-- 结束状态：林照确认档案被人工访问过，并发现访问时间与妹妹失踪时间接近。
-- 连续性要点：第 3 场的撤离编号得到部分验证；妹妹是否存活仍未确认。
-- 验收重点：世界规则一致性、证据强度、悬疑节奏。
+- Scene goal: Lin Zhao checks the evacuation numbers and finds human access traces in the lighthouse archive.
+- Entrance: Lin Zhao holds unpublished evacuation numbers but cannot confirm her sister is on the list; the city is less than 24 hours from a formal tide warning.
+- Characters: Lin Zhao, Zhou Cen, archive director Gu Xian.
+- Location: main control Archive Room of the public archive.
+- Conflict: the director tells Lin Zhao to return the chip and stop querying; system logs show someone used human privileges to access the evacuation file.
+- Must happen: Lin Zhao confirms the access record through a formal archive query; she must not blame the lighthouse system itself for the anomaly.
+- Must not happen: do not break the rule that the lighthouse may only store and display memory; do not confirm the director is the hidden operator.
+- Exit: Lin Zhao confirms the file was accessed by a person, and the access time is close to her sister's disappearance.
+- Continuity: scene 3's evacuation numbers are partly verified; whether the sister is alive is still unconfirmed.
+- Acceptance: world-rule consistency, evidence strength, mystery pacing.
 
-### 第 5 场：公开潮汐
+### Scene 5: Open Tide
 
-- 场次目标：在正式潮汐预警前，林照决定是否公开档案异常和妹妹线索。
-- 进入状态：林照掌握芯片、撤离编号和人工访问日志，但没有完整证明幕后人员。
-- 人物：林照、周岑、顾弦、灯塔播报系统。
-- 地点：公共档案馆广播厅。
-- 冲突：顾弦要求封存资料，灯塔即将发布正式潮汐预警；林照必须在证据不完整时承担公开后果。
-- 必须发生：林照公开已经确认的事实和证据范围；她明确区分事实、推断和未知内容。
-- 禁止发生：不能把“妹妹存活”当成已确认事实；不能让灯塔撤回已经发布的正式预警。
-- 结束状态：档案异常和未公开撤离编号被公开，妹妹的生死仍作为待查问题保留。
-- 连续性要点：承接第 4 场的日志证据；结局方向允许后续继续追查，但不能凭空补全未知真相。
-- 验收重点：事实和推断区分、世界规则、结局方向和记忆提案。
+- Scene goal: before the formal tide warning, Lin Zhao decides whether to publish the archive anomaly and her sister's clue.
+- Entrance: Lin Zhao has the chip, the evacuation numbers, and the human-access log, but no complete proof of the hidden operator.
+- Characters: Lin Zhao, Zhou Cen, Gu Xian, lighthouse broadcast system.
+- Location: public-archive broadcast hall.
+- Conflict: Gu Xian wants the files sealed. The lighthouse is about to publish a formal tide warning. Lin Zhao must accept the cost of publishing with incomplete proof.
+- Must happen: Lin Zhao publishes the confirmed facts and the scope of the evidence; she clearly separates fact, inference, and unknown.
+- Must not happen: do not treat "the sister is alive" as a confirmed fact; do not let the lighthouse withdraw a formal warning already published.
+- Exit: the archive anomaly and unpublished evacuation numbers are public. The sister's life or death remains an open question.
+- Continuity: carry scene 4's log evidence; the ending may continue later investigation, but must not invent the unknown truth.
+- Acceptance: fact vs inference, world rules, ending direction, and the memory proposal.
 
-### 第 6–20 场：规模续写
+### Scenes 6–20: scale continuation
 
-第 1–5 场的场次卡仍然有效。第 6 场起不再预写逐场大纲，由规划 Agent 根据 CreativeBrief、世界规则和上一场 `accepted_scene_state` 连续推进。约束：
+Scene cards 1–5 still stand. From scene 6 on, do not prewrite scene-by-scene outlines. The planning agent continues from the CreativeBrief, world rules, and the previous `accepted_scene_state`. Constraints:
 
-- 仍是同一本书，每章两场，20 场对应第 1–10 章。
-- 不得提前宣布全书结束，也不得确认林澜已经死亡或已经平安归来。
-- 灯塔只能保存、检索和展示记忆，不能直接改写记忆。
-- 每一场必须有可由正文证实的新推进，不能只重复前五场已经公开的事实。
+- Still the same book, two scenes per chapter. 20 scenes map to chapters 1–10.
+- Do not announce the book is over. Do not confirm Lin Lan is dead or safely home.
+- The lighthouse may only store, retrieve, and display memory. It cannot rewrite memory.
+- Each scene must have new, prose-provable advance. Do not only repeat facts already published in the first five scenes.
 
-## 三、ContextPack检查要求
+## 3. ContextPack checks
 
-每场生成前检查：
+Before each scene, check:
 
-- 是否读取正确的 `brief_version`。
-- 是否读取上一场的 `accepted_scene_state`。
-- 是否带入必要的规则和人物状态。
-- 是否排除了待定 MemoryProposal。
-- 是否记录来源版本、排除项、缺失项和快照哈希。
-- 是否绑定当前 `plan_version`、`scene_id`和`target_agent`。
+- The correct `brief_version` is read.
+- The previous `accepted_scene_state` is read.
+- Needed rules and character state are included.
+- Pending MemoryProposal items are excluded.
+- Source versions, exclusions, missing items, and the snapshot hash are recorded.
+- The current `plan_version`, `scene_id`, and `target_agent` are bound.
 
-重点检查的状态传递：
+State handoff to watch:
 
 ```text
-第 1 场：芯片未回放
-第 2 场：回放后获得地点，丢失二十七分钟记忆
-第 3 场：保留记忆缺口，发现撤离编号
-第 4 场：确认人工访问日志
-第 5 场：公开已确认事实，妹妹生死仍未知
+Scene 1: chip not played
+Scene 2: playback gives a place; twenty-seven minutes of memory are lost
+Scene 3: memory gap kept; evacuation numbers found
+Scene 4: human-access log confirmed
+Scene 5: confirmed facts published; sister's life or death still unknown
 ```
 
-## 四、阶段 12测试记录
+## 4. Stage 12 test record
 
-每场至少记录：
+Each scene should at least record:
 
-- 任务编号
-- 场次编号
-- ContextPack版本
-- 规划版本
-- 正文版本和正文哈希
-- 三位审查员结果
-- 是否返工
-- 是否产生 MemoryProposal
-- 是否更新 `accepted_scene_state`
-- Harness调用编号
-- 模型、耗时和用量
+- Task id
+- Scene number
+- ContextPack version
+- Plan version
+- Draft version and draft hash
+- Three reviewer results
+- Whether writing was reworked
+- Whether a MemoryProposal was produced
+- Whether `accepted_scene_state` was updated
+- Harness call id
+- Model, elapsed time, and usage
 
-真实模型测试至少覆盖：
+Real-model tests should at least cover:
 
-- 一场正常完成
-- 一场产生返工或人工发起重新生文
-- 一场产生记忆提案
-- 五场之间的状态连续传递
-- API切换只修改 Harness配置，不修改业务代码
+- One scene completed normally
+- One scene that reworks writing or is human-restarted
+- One scene that produces a memory proposal
+- State handoff across five scenes
+- Switching APIs by changing Harness config only, not business code

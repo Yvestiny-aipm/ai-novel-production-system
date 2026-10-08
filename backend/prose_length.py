@@ -1,36 +1,40 @@
 """Authoritative prose-length measurement and validation.
 
-The model may report a length, but that value is audit data only.  The
-orchestrator uses this module's count for every workflow decision.
+Official count is English words via whitespace split. Column names
+word_count and actual_character_count are historical; stored values
+are word counts. The model's self-report is audit data only.
 """
 from __future__ import annotations
 
 MIN_CHARACTER_COUNT = 1000
-# Acceptance floor only. Prompts and expand deltas keep MIN_CHARACTER_COUNT.
-GATE_MIN_CHARACTER_COUNT = 800
-MAX_CHARACTER_COUNT = 2300
+MAX_CHARACTER_COUNT = 1500
 MAX_LENGTH_FAILURES_IN_PLAN = 4
 LENGTH_FAILURE_REASONS = frozenset({"empty_text", "under_length", "over_length"})
 DEFAULT_TARGET_WORD_COUNT = 1250
 PREFERRED_SOFT_MIN = 1200
 PREFERRED_SOFT_MAX = 1350
-WRITING_PROMPT_VERSION = "prose_quality_v8"
+WRITING_PROMPT_VERSION = "prose_quality_v9"
+
+
+def actual_word_count(text: str | None) -> int:
+    """Official count: whitespace-split English words. don't / it's count as 1."""
+    if not isinstance(text, str):
+        return 0
+    return len(text.split())
 
 
 def actual_character_count(text: str | None) -> int:
-    """Count every non-whitespace character (including Chinese punctuation)."""
-    if not isinstance(text, str):
-        return 0
-    return sum(1 for character in text if not character.isspace())
+    """Historical name. Returns the official word count."""
+    return actual_word_count(text)
 
 
 def validate_prose_length(text: str | None, *, target_word_count: int = DEFAULT_TARGET_WORD_COUNT) -> dict:
     """Return durable, model-independent length validation metadata."""
-    actual = actual_character_count(text)
+    actual = actual_word_count(text)
     target = target_word_count if isinstance(target_word_count, int) and target_word_count > 0 else DEFAULT_TARGET_WORD_COUNT
     if actual == 0:
         reason = "empty_text"
-    elif actual < GATE_MIN_CHARACTER_COUNT:
+    elif actual < MIN_CHARACTER_COUNT:
         reason = "under_length"
     elif actual > MAX_CHARACTER_COUNT:
         reason = "over_length"

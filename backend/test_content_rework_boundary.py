@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import words
 
 from integration.recovery import apply_content_failure, apply_length_failure
 from integration.run_real_test import run, save_draft
@@ -27,7 +28,7 @@ def plan(number):
 
 def prose(size):
     return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
-        "text": "潮" * size, "word_count": 1250, "target_word_count": 1250,
+        "text": words(size), "word_count": 1250, "target_word_count": 1250,
         "complete": True, "writer_self_check": {"complete": True},
     }}
 
@@ -41,15 +42,15 @@ def reviewer(role, *, result="passed", issue_count=0):
                         "events": ["发现线索"], "relationship_changes": [], "unresolved_threads": ["林澜失踪"]},
         "progression_assessment": {"status": "achieved", "achieved_items": [{
             "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-            "after_state": "发现线索", "evidence_text": "潮", "evidence_location": "draft.text",
-        }], "missing_items": [], "evidence": "潮"},
+            "after_state": "发现线索", "evidence_text": "word", "evidence_location": "draft.text",
+        }], "missing_items": [], "evidence": "word"},
     }}
 
 
 def memory():
     return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
         "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
         "evidence_location": "draft.payload.text", "change_reason": "审查通过", "conflict_status": "none",
         "write_policy": "human_confirmation", "status": "pending",
     }}
@@ -80,7 +81,7 @@ class SequenceAdapter:
             size = self.sizes.pop(0) if self.sizes else 1000
             unique = chr(0x4E00 + self.writes)
             payload = prose(max(size, 1))
-            payload["payload"]["text"] = ("潮" * (size - 1) + unique) if size else unique
+            payload["payload"]["text"] = words(size, lead="word", token=f"tok{self.writes}") if size else "word"
             return payload
         if role == "memory_extraction":
             return memory()
@@ -475,7 +476,7 @@ with tempfile.TemporaryDirectory() as directory:
     path = Path(directory) / "exact-count.db"
     from integration.run_real_test import save_plan
     db, book = seed(path)
-    text = "完全相同正文" * 200
+    text = words(1000, token="samebody")
     save_plan(db, book, book + "_chapter_1", book + "_scene_1", unique_plan("第一场独特目标", "第一场独特动作"), "hc_p1")
     save_draft(db, book, book + "_chapter_1", book + "_scene_1", {
         "contract_type": "ProseDraft", "contract_version": "v1",

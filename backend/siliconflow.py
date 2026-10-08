@@ -1,4 +1,4 @@
-"""硅基流动 OpenAI 兼容接口适配器。密钥只从环境变量读取。"""
+"""SiliconFlow OpenAI-compatible adapter. Keys are read from the environment only."""
 import hashlib, json, os, re, urllib.request
 
 from backend.character_canon import character_canon_instruction
@@ -54,7 +54,7 @@ class ModelResponseParseError(RuntimeError):
 
 CONTRACT_FIELDS = {
     'ScenePlan': 'scene_goal, entrance_state, exit_state, characters, location, time_context, conflict, action_beats, must_happen, must_not_happen, knowledge_boundary, target_word_count (exactly 1250; never 2000, 1000, 1500, or any other value), acceptance_criteria, validation_result, ready_for_writing, progression_requirements (non-empty array: progress_type, target_key, before_state, expected_after_state, acceptance_criterion). progress_type must be one of new_clue, character_state_change, relationship_change, conflict_change, decision_or_consequence, thread_opened, thread_advanced, thread_closed, goal_milestone. before_state must copy progression_baseline literally; do not summarize or invent.',
-    'ProseDraft': f'text (complete scene prose, not a plot summary; aim for {PREFERRED_SOFT_MIN}-{PREFERRED_SOFT_MAX} non-whitespace Chinese characters so the {MIN_CHARACTER_COUNT}-{MAX_CHARACTER_COUNT} hard range has margin), word_count (>0, self-check audit value only; backend recounts), target_word_count (1250), complete (true), writer_self_check; never return empty text or incomplete=true. Finish a concrete action, interaction, turning point, and outcome. Complete at least one ScenePlan progression_requirements item in the prose. Self-check length before return, but word_count is never official. Return JSON only; no explanation outside text.',
+    'ProseDraft': f'text (complete scene prose, not a plot summary; aim for {PREFERRED_SOFT_MIN}-{PREFERRED_SOFT_MAX} words; hard range {MIN_CHARACTER_COUNT}-{MAX_CHARACTER_COUNT} words), word_count (>0, self-check audit value only; backend recounts words), target_word_count (1250 words), complete (true), writer_self_check; never return empty text or incomplete=true. Finish a concrete action, interaction, turning point, and outcome. Complete at least one ScenePlan progression_requirements item in the prose. Self-check length before return, but word_count is never official. Return JSON only; no explanation outside text.',
     'ReviewerResult': 'reviewer_role must match the assigned task (review_world=world_consistency, review_plot=character_plot, review_style=language_experience); result (passed|failed only); findings (array of must-fix issues); suggestions (array of optional polish); issue_count must equal findings length and never count suggestions; severity (ordinary|serious); impact_scope (local|cross_scene|cross_chapter|book); true_conflict_candidate (boolean); scene_state with characters, location, time_context, events, relationship_changes, unresolved_threads extracted from the current draft; character_plot must include progression_assessment with status (achieved|not_achieved|unclear; never partial, partially_achieved, or partial_success), achieved_items and missing_items. Every achieved item includes progress_type,target_key,before_state copied from ScenePlan, after_state that contains expected_after_state, evidence_text copied verbatim from this draft, evidence_location. Empty findings require result=passed and issue_count=0; non-empty findings require result=failed.',
     'QualityReport': 'review_completion_status must be completed (never complete); reviewer_results; deduped_issue_count; ordinary_issue_count; serious_issue_count; has_true_conflict; needs_arbiter must be false; routing_recommendation must be complete or rewrite (never proceed_with_revisions); accepted_scene_state must contain characters, location, time_context, events, relationship_changes, unresolved_threads; status must be passed or failed (never accepted_with_notes). Do not declare progression_status; the backend verifies progression.',
     'MemoryProposal': 'either (A) one complete proposal recording a confirmed fictional fact change with memory_type, target_scope, target_key, action, before_value, after_value, evidence, evidence_location, change_reason, conflict_status (none|conflict|resolved), write_policy (auto_save|human_confirmation|never_auto_write), status (pending|approved|rejected|written|conflict), or (B) no confirmed fictional fact change to record: payload exactly contains status="skipped" and a non-empty reason; never return empty proposal fields or a proposals array',
@@ -215,7 +215,8 @@ def looks_like_plain_prose(text):
     stripped = (text or "").strip()
     if not stripped or stripped[0] in "{[":
         return False
-    return actual_character_count(stripped) >= MIN_PLAIN_PROSE_WRAP_CHARS
+    visible = sum(1 for character in stripped if not character.isspace())
+    return visible >= MIN_PLAIN_PROSE_WRAP_CHARS
 
 
 def wrap_plain_prose_as_draft(content, *, finish_reason=None):
@@ -302,12 +303,12 @@ def contract_system_prompt(expected):
         " For ScenePlan, generate a concrete scene goal, entrance_state, exit_state, characters, location, time_context, conflict, action_beats, must_happen, must_not_happen, knowledge_boundary, target_word_count, acceptance_criteria, and validation_result."
         f" target_word_count MUST be exactly {DEFAULT_TARGET_WORD_COUNT}."
         " Do not output 2000, 1000, 1500, or any other target_word_count."
-        f" The finished prose may later contain {MIN_CHARACTER_COUNT}-{MAX_CHARACTER_COUNT} non-whitespace characters; that range is not the ScenePlan target."
+        f" The finished prose may later contain {MIN_CHARACTER_COUNT}-{MAX_CHARACTER_COUNT} words; that range is not the ScenePlan target."
         " Do not copy the ContextPack as the plan. validation_result must state that every required field is complete and valid; set ready_for_writing to true only after this self-check passes. If any required field is missing or empty, do not claim a complete plan."
         " characters, location, time_context, entrance_state, and exit_state MUST each appear independently at the payload top level."
         " Nested presence inside entrance_state or exit_state does not replace those top-level fields; do not omit them even if the nested objects already contain the same keys."
         " If progression_baseline is present, before_state must copy an existing baseline state literally: no summary, rewrite, abbreviation, or inference."
-        " Truly new clues or threads may use 未知; expected_after_state describes this scene's new state."
+        " Truly new clues or threads may use unknown; expected_after_state describes this scene's new state."
         " Prefer 1-3 key progression_requirements, not a long target list."
     ) if expected == 'ScenePlan' else ''
     reviewer_rule = (
@@ -315,11 +316,11 @@ def contract_system_prompt(expected):
         " reviewer_role MUST match the assigned task: review_world=world_consistency, review_plot=character_plot, review_style=language_experience."
         " result MUST be passed or failed, never pass_with_notes."
         " findings MUST be an array of must-fix issues only. suggestions MUST be an array of optional polish only."
-        " findings / suggestions / evidence / scene_state 字符串禁止裸 ASCII \"，改用「」或中文引号。"
+        " In findings / suggestions / evidence / scene_state JSON strings, escape ASCII quotes; curly quotes are allowed in prose."
         " issue_count MUST equal findings length and MUST NOT count suggestions."
         " Empty findings require result=passed and issue_count=0; acceptable prose MAY return findings=[]."
         " Non-empty findings require result=failed. Do not invent findings to look thorough."
-        " Phrases such as 可接受, 可酌情, 可以优化, or 略显重复 belong in suggestions, not findings."
+        " Phrases such as acceptable, optional, could polish, or slightly repetitive belong in suggestions, not findings."
         " severity MUST be ordinary or serious. impact_scope MUST be local, cross_scene, cross_chapter, or book."
         " The character_plot reviewer MUST read scene_plan.payload.progression_requirements item by item."
         " Each achieved_item.progress_type, target_key, and before_state MUST copy the planned values exactly."
@@ -353,7 +354,7 @@ def contract_system_prompt(expected):
     ) if expected == 'QualityReport' else ''
     memory_proposal_rule = (
         " For MemoryProposal, this is fictional-work scene-state bookkeeping, not extracting or storing a real person's memory."
-        " 记录本场已确认的虚构事实变化。"
+        " Record confirmed fictional fact changes from this scene."
         " Do not extract, hand over, or write a real person's memory."
         " Choose exactly one outcome: a complete single proposal, or payload {\"status\":\"skipped\",\"reason\":\"...\"} when this scene has no durable new fictional fact to record."
         " The skipped outcome must contain no proposal fields and does not need target_key. If submitting a proposal, target_key is mandatory and must be a specific, stable identifier for the fact's real subject: "
@@ -367,8 +368,8 @@ def contract_system_prompt(expected):
     ) if expected == 'MemoryProposal' else ''
     prose_draft_rule = (
         " For ProseDraft, write a complete scene rather than a plot summary."
-        f" Aim for {PREFERRED_SOFT_MIN}-{PREFERRED_SOFT_MAX} non-whitespace Chinese characters;"
-        f" the backend hard range remains {MIN_CHARACTER_COUNT}-{MAX_CHARACTER_COUNT} and is recalculated independently."
+        f" Aim for {PREFERRED_SOFT_MIN}-{PREFERRED_SOFT_MAX} words;"
+        f" the backend hard range remains {MIN_CHARACTER_COUNT}-{MAX_CHARACTER_COUNT} words and is recalculated independently."
         " Write 12-15 effective paragraphs; each paragraph must carry action, interaction, resistance, a turning point, or a result."
         " Do not pad with environment, weather, or atmosphere. Do not replace the scene with a plot summary."
         " Complete at least one ScenePlan progression_requirements item."
@@ -390,9 +391,9 @@ def contract_system_prompt(expected):
 def _official_count_instruction(feedback):
     actual = feedback.get("previous_actual_character_count")
     reported = feedback.get("previous_model_reported_word_count")
-    parts = ["正式长度以后端实算为准，word_count 不是官方计数。"]
+    parts = ["Official length is the backend word count. word_count is not official."]
     if reported is not None and actual is not None and str(reported).strip() != "":
-        parts.append(f"你自称{reported}，后端实算{actual}，以{actual}为准。")
+        parts.append(f"You claimed {reported}; the backend counted {actual} words. Use {actual}.")
     return "".join(parts)
 
 
@@ -401,30 +402,30 @@ def writing_length_edit_instruction(feedback):
     actual = feedback["previous_actual_character_count"]
     required = feedback["required_minimum_character_delta"]
     preferred = feedback["preferred_character_delta"]
-    hard = f"{MIN_CHARACTER_COUNT}～{MAX_CHARACTER_COUNT}"
-    soft = f"{PREFERRED_SOFT_MIN}～{PREFERRED_SOFT_MAX}"
+    hard = f"{MIN_CHARACTER_COUNT}-{MAX_CHARACTER_COUNT}"
+    soft = f"{PREFERRED_SOFT_MIN}-{PREFERRED_SOFT_MAX}"
     official = _official_count_instruction(feedback)
     if feedback.get("adjustment_direction") == "expand":
         return (
-            f"上一稿实际为{actual}个非空白字符。本次必须输出{hard}，建议{soft}。"
+            f"The previous draft was {actual} words. This draft must be {hard} words, preferred {soft}."
             f"{official}"
-            f"至少增加{required}，建议增加{preferred}。"
-            "禁止交回同一篇。必须加到硬下限以上。"
-            "再交回同一篇会被立即阻断。"
-            "把已有节拍的动作、对话、阻力写得更具体来加字。"
-            "不要另起一场戏，但不要因为这句话就整篇不动。"
-            "不得新增未铺垫人物、地点、世界机制。"
-            "不得让灯塔具备保存与展示记忆以外的能力。"
-            "不要复述，不要在结尾补总结。"
+            f"Add at least {required} words, preferably {preferred}."
+            "Do not resubmit the same draft. You must reach the hard minimum."
+            "Resubmitting the same draft will be blocked immediately."
+            "Expand existing beats: make action, dialogue, and resistance more concrete."
+            "Do not start a new plot, but do not leave the draft unchanged because of this sentence."
+            "Do not add unprepared characters, places, or world mechanisms."
+            "Do not give the lighthouse any power beyond storing and displaying memory."
+            "Do not recap. Do not add a closing summary."
         )
     return (
-        f"上一稿实际为{actual}个非空白字符。本次必须输出{hard}，建议{soft}。"
+        f"The previous draft was {actual} words. This draft must be {hard} words, preferred {soft}."
         f"{official}"
-        f"至少删除{required}，建议删除{preferred}。"
-        "禁止交回同一篇。必须删到硬上限以下。"
-        "再交回同一篇会被立即阻断。"
-        "请真正删除重复环境、心理和同义表达。"
-        "不能只改word_count，不能近乎原样返回。"
+        f"Cut at least {required} words, preferably {preferred}."
+        "Do not resubmit the same draft. You must get under the hard maximum."
+        "Resubmitting the same draft will be blocked immediately."
+        "Really delete repeated setting, interiority, and synonymous phrasing."
+        "Do not only change word_count. Do not return nearly the same text."
     )
 
 
@@ -439,14 +440,14 @@ def _finding_part_text(part):
             value = part.get(key)
             if isinstance(value, str) and value.strip():
                 pieces.append(value.strip())
-        return "：".join(pieces)
+        return ": ".join(pieces)
     return str(part).strip() if part else ""
 
 
 def _finding_text(item):
     findings = item.get("findings")
     if isinstance(findings, list):
-        return "；".join(text for text in (_finding_part_text(part) for part in findings) if text)
+        return "; ".join(text for text in (_finding_part_text(part) for part in findings) if text)
     if isinstance(findings, dict):
         return _finding_part_text(findings)
     return str(findings or "").strip()
@@ -454,9 +455,9 @@ def _finding_text(item):
 
 def writing_quality_edit_instruction(feedback):
     parts = [
-        "上一稿 QualityReport 失败。未点名的可用段落可以保留；"
-        "findings 点名的句子必须改写或删除。必须实际修改正文。"
-        "禁止整篇原样返回。禁止原样返回。禁止只改结构化字段或word_count。"
+        "The previous QualityReport failed. Keep unnamed usable paragraphs. "
+        "Sentences named in findings must be rewritten or deleted. You must edit the prose. "
+        "Do not return the same draft. Do not only change structured fields or word_count."
     ]
     findings = feedback.get("reviewer_findings") or []
 
@@ -467,48 +468,48 @@ def writing_quality_edit_instruction(feedback):
     plot = role_issues("character_plot")
     style = role_issues("language_experience")
     if world:
-        parts.append("世界/连续性问题：" + "；".join(_finding_text(item) or "需修正" for item in world) + "。")
+        parts.append("World / continuity issues: " + "; ".join(_finding_text(item) or "needs a fix" for item in world) + ".")
     if plot:
-        parts.append("人物/剧情问题：" + "；".join(_finding_text(item) or "需修正" for item in plot) + "。")
+        parts.append("Character / plot issues: " + "; ".join(_finding_text(item) or "needs a fix" for item in plot) + ".")
     if style:
-        parts.append("语言问题：" + "；".join(_finding_text(item) or "需修正" for item in style) + "。")
+        parts.append("Language issues: " + "; ".join(_finding_text(item) or "needs a fix" for item in style) + ".")
     if feedback.get("progression_status") == "failed" and (feedback.get("missing_progression_items") or feedback.get("progression_failure_reason")):
         reason = feedback.get("progression_failure_reason") or "planned_progression_not_achieved"
-        parts.append(f"推进目标未完成，原因：{reason}。必须完成原规划目标，不得另造 target_key 或 progress_type。")
+        parts.append(f"Progression is incomplete. Reason: {reason}. Complete the planned items. Do not invent a new target_key or progress_type.")
     return "".join(parts)
 
 
 REVIEWER_ENUM_INSTRUCTION = (
-    "severity 只能是 ordinary 或 serious。"
-    "impact_scope 只能是 local、cross_scene、cross_chapter 或 book。"
+    "severity must be ordinary or serious."
+    "impact_scope must be local, cross_scene, cross_chapter, or book."
 )
 
 
 def reviewer_findings_instruction():
     return (
-        "findings 必须是数组，只放必须返工的硬问题："
-        "世界规则冲突、前后事实矛盾、人物行为明显不成立、剧情没有完成有效推进、"
-        "证据不存在、严重语法或表达错误、明显影响阅读理解、跨场/跨章/全书硬问题、真正审查冲突。"
-        "suggestions 必须是数组，只放可选优化："
-        "某句略重复、可酌情精简、可以换词、节奏还有空间但不影响阅读、比喻可以更丰富、非必要风格偏好。"
-        "可接受、可酌情、可以优化、略显重复等非必要修改只能进入 suggestions。"
-        "issue_count 必须等于 findings 长度，不得把 suggestions 计入 issue_count。"
-        "findings 为空时 result 必须是 passed、issue_count 必须是 0；正文达到标准时允许 findings=[]。"
-        "findings 非空时 result 必须是 failed。"
-        "result 只能是 passed 或 failed，不得返回 pass_with_notes。"
-        "不得为了显得认真而强行制造 findings。"
-        "suggestions 不触发 Writing 返工、Arbiter 或阻塞，但仍须完整返回。"
+        "findings must be an array of must-fix issues only: "
+        "world-rule conflicts, fact contradictions, implausible character action, missing planned progression, "
+        "missing evidence, serious grammar that blocks reading, hard cross-scene / cross-chapter / book issues, true review conflicts."
+        "suggestions must be an array of optional polish only: "
+        "a slightly repetitive sentence, optional tightening, a word swap, unused rhythm, richer metaphor, non-required style preference."
+        "Acceptable / optional / could polish / slightly repetitive notes belong only in suggestions."
+        "issue_count must equal findings length and must not count suggestions."
+        "Empty findings require result=passed and issue_count=0; acceptable prose may return findings=[]."
+        "Non-empty findings require result=failed."
+        "result must be passed or failed, never pass_with_notes."
+        "Do not invent findings to look thorough."
+        "suggestions do not trigger Writing rework, Arbiter, or a block, but must still be returned in full."
     )
 
 
 def reviewer_world_instruction():
     return (
-        "reviewer_role 必须严格为 world_consistency。"
-        "只检查世界规则、设定、时间地点、知识边界和前后连续性。"
+        "reviewer_role must be exactly world_consistency."
+        "Check only world rules, setting, time and place, knowledge boundary, and continuity."
         + character_canon_instruction()
         + setting_canon_instruction()
-        + "不得冒充 character_plot。"
-        "progression_assessment 可不提供。"
+        + "Do not impersonate character_plot."
+        "progression_assessment may be omitted."
         + reviewer_findings_instruction()
         + REVIEWER_ENUM_INSTRUCTION
     )
@@ -516,15 +517,15 @@ def reviewer_world_instruction():
 
 def reviewer_plot_instruction():
     return (
-        "reviewer_role 必须严格为 character_plot。"
-        "负责人物行为、剧情结构和 progression_assessment。"
-        "progression_assessment.status 只能是 achieved、not_achieved、unclear。"
-        "有至少一个合法 achieved_item 时，status 使用 achieved。"
-        "没有达成项且存在 missing_items 时，status 使用 not_achieved。"
-        "无法判断时使用 unclear。"
-        "achieved_items 必须精确对应 ScenePlan 的 progress_type、target_key、before_state。"
-        "after_state 必须包含对应 expected_after_state 的原文表达。"
-        "不得返回 partial、partially_achieved、partial_success。"
+        "reviewer_role must be exactly character_plot."
+        "Own character behavior, plot structure, and progression_assessment."
+        "progression_assessment.status must be achieved, not_achieved, or unclear."
+        "If at least one legal achieved_item exists, status is achieved."
+        "If there is no achieved item and missing_items is non-empty, status is not_achieved."
+        "Use unclear only when the draft cannot be judged."
+        "achieved_items must copy ScenePlan progress_type, target_key, and before_state exactly."
+        "after_state must contain the planned expected_after_state wording."
+        "Do not return partial, partially_achieved, or partial_success."
         + reviewer_progression_instruction()
         + reviewer_evidence_instruction()
         + reviewer_findings_instruction()
@@ -534,10 +535,10 @@ def reviewer_plot_instruction():
 
 def reviewer_style_instruction():
     return (
-        "reviewer_role 必须严格为 language_experience。"
-        "只检查语言、节奏、可读性和明显表达问题。"
-        "不得冒充 character_plot。"
-        "progression_assessment 可不提供。"
+        "reviewer_role must be exactly language_experience."
+        "Check only language, rhythm, readability, and obvious expression problems."
+        "Do not impersonate character_plot."
+        "progression_assessment may be omitted."
         + reviewer_findings_instruction()
         + REVIEWER_ENUM_INSTRUCTION
     )
@@ -553,81 +554,81 @@ def reviewer_instruction_for_task(task_type):
 
 def reviewer_progression_instruction():
     return (
-        "逐项核验 scene_plan.payload.progression_requirements。"
-        "achieved_item 必须原样使用规划的 progress_type、target_key、before_state。"
-        "after_state 必须包含对应 expected_after_state 的原文表达，evidence_text 必须是当前 draft.payload.text 的连续逐字子串。"
-        "不得创造 character_development、world_expansion、emotional_response 等规划外类型或 target_key。"
-        "未完成时放入 missing_items，不能换一个目标冒充完成。"
-        "scene_state 必须包含 characters、location、time_context、events、relationship_changes、unresolved_threads。"
-        "每个 achieved_item.after_state 必须同步进入 scene_state 的对应字段："
-        "new_clue → events 或 unresolved_threads；"
-        "character_state_change → characters 或 events；"
-        "relationship_change → relationship_changes；"
-        "thread_opened、thread_advanced、thread_closed → unresolved_threads 或 events。"
-        "不能只在 progression_assessment 中写 after_state。"
+        "Check scene_plan.payload.progression_requirements item by item."
+        "Each achieved_item must copy the planned progress_type, target_key, and before_state."
+        "after_state must contain the planned expected_after_state wording. evidence_text must be a contiguous verbatim substring of the current draft.payload.text."
+        "Do not invent progress_type values such as character_development, world_expansion, or emotional_response, or a new target_key."
+        "If an item is not completed, put it in missing_items. Do not substitute another goal."
+        "scene_state must include characters, location, time_context, events, relationship_changes, unresolved_threads."
+        "Each achieved_item.after_state must also land in the matching scene_state field: "
+        "new_clue → events or unresolved_threads; "
+        "character_state_change → characters or events; "
+        "relationship_change → relationship_changes; "
+        "thread_opened, thread_advanced, thread_closed → unresolved_threads or events."
+        "Do not write after_state only inside progression_assessment."
     )
 
 
 def reviewer_correction_instruction():
     return (
-        "这是一次 ReviewerResult Contract 技术纠正，correction_attempt=1，禁止再次循环纠正。"
-        "只纠正非法字段，不得改写 ScenePlan 或 Draft。"
-        "progression_assessment.status 只能是 achieved、not_achieved、unclear。"
-        "有至少一个合法 achieved_item 时，status 使用 achieved。"
-        "没有达成项且存在 missing_items 时，status 使用 not_achieved。"
-        "无法判断时使用 unclear。"
-        "禁止 partial、partially_achieved、partial_success。"
-        "每个 achieved_item 的 progress_type、target_key、before_state 必须原样匹配 ScenePlan。"
-        "after_state 必须包含对应 expected_after_state 的原文表达。"
-        "evidence_text 必须是 Draft 正文中的连续逐字子串；找不到证据就移入 missing_items，不能伪造。"
+        "This is a ReviewerResult contract technical correction, correction_attempt=1. Do not loop again."
+        "Fix illegal fields only. Do not rewrite the ScenePlan or Draft."
+        "progression_assessment.status must be achieved, not_achieved, or unclear."
+        "If at least one legal achieved_item exists, status is achieved."
+        "If there is no achieved item and missing_items is non-empty, status is not_achieved."
+        "Use unclear only when the draft cannot be judged."
+        "Do not use partial, partially_achieved, or partial_success."
+        "Each achieved_item progress_type, target_key, and before_state must match the ScenePlan exactly."
+        "after_state must contain the planned expected_after_state wording."
+        "evidence_text must be a contiguous verbatim substring of the Draft. If no evidence exists, move the item to missing_items. Do not invent it."
         + reviewer_findings_instruction()
-        + "旧的 pass_with_notes、字符串 findings、或把可酌情精简写入 findings 的结构必须改成新结构。"
+        + "Old pass_with_notes, string findings, or optional-tightening notes stuffed into findings must be converted to the new structure."
     )
 
 
 def reviewer_evidence_instruction():
     return (
-        "evidence_text只复制正文中的一个短而连续的原句或连续片段。"
-        "建议控制在1～2句话。"
-        "不得跨段拼接。"
-        "不得删去中间句子。"
-        "不得使用“……”或省略号代替原文。"
-        "不得改写、翻译或总结。"
-        "引号必须与正文一致，不要把 “ ” 改成 ‘ ’ 或 ASCII 引号。"
-        "返回前确认Python语义上的：evidence_text in draft.payload.text。"
-        "如果找不到连续原文，必须放入missing_items或status=unclear，不能声称achieved。"
+        "evidence_text copies one short contiguous original sentence or fragment from the draft."
+        "Prefer one or two sentences."
+        "Do not splice across paragraphs."
+        "Do not drop a middle sentence."
+        "Do not replace the original with an ellipsis."
+        "Do not rewrite, translate, or summarize."
+        "Quotes must match the draft. Do not turn curly quotes into ASCII quotes."
+        "Before return, confirm the Python meaning: evidence_text in draft.payload.text."
+        "If no contiguous original exists, put the item in missing_items or set status=unclear. Do not claim achieved."
     )
 
 
 def arbiter_quality_instruction():
     return (
-        "必须返回完整 QualityReport。"
-        "review_completion_status 只能是 completed，不得返回 complete。"
-        "status 只能是 passed 或 failed，不得返回 accepted_with_notes。"
-        "routing_recommendation 只能是 complete 或 rewrite，不得返回 proceed_with_revisions。"
-        "needs_arbiter 必须为 false。"
-        "accepted_scene_state 必须包含 characters、location、time_context、events、relationship_changes、unresolved_threads。"
-        "对照 scene_plan、draft、reviewer_results、preliminary_quality 和 progression_requirements 裁决争议。"
-        "不得自行声明推进通过；progression 字段由后端核验写入。"
+        "Return a complete QualityReport."
+        "review_completion_status must be completed, never complete."
+        "status must be passed or failed, never accepted_with_notes."
+        "routing_recommendation must be complete or rewrite, never proceed_with_revisions."
+        "needs_arbiter must be false."
+        "accepted_scene_state must include characters, location, time_context, events, relationship_changes, unresolved_threads."
+        "Judge disputes against scene_plan, draft, reviewer_results, preliminary_quality, and progression_requirements."
+        "Do not declare progression passed; the backend writes those fields after verification."
     )
 
 
 def planning_progression_instruction():
     return (
-        "before_state 必须直接复制 progression_baseline 中的现有状态，不得总结、改写、缩写或自行推断。"
-        "真正新增的线索或悬念可以使用“未知”。"
-        "expected_after_state 才描述本场预计的新状态。"
-        "第一版优先只设置1～3项关键推进，不要一次塞入过多目标。"
-        "new_clue：before_state 可为未知，否则必须存在于上一场 events 或 unresolved_threads。"
-        "character_state_change：before_state 必须存在于上一场 characters 或 events。"
-        "relationship_change：before_state 必须存在于上一场 relationship_changes。"
-        "conflict_change：before_state 必须存在于 events、relationship_changes 或 unresolved_threads。"
-        "decision_or_consequence：before_state 必须存在于 events 或 characters。"
-        "thread_advanced 与 thread_closed：before_state 必须存在于 unresolved_threads 或 events。"
-        "thread_opened：可使用未知，不能把已有悬念冒充新悬念。"
-        "goal_milestone：before_state 必须存在于 events。"
-        "characters、location、time_context、entrance_state、exit_state 必须在 payload 顶层独立出现。"
-        "不能因为这些字段已出现在 entrance_state 或 exit_state 中就省略顶层字段。"
+        "before_state must copy an existing state from progression_baseline literally. Do not summarize, rewrite, abbreviate, or infer."
+        "Truly new clues or threads may use unknown."
+        "expected_after_state describes this scene's expected new state."
+        "The first version should set only 1-3 key progression items. Do not load too many targets."
+        "new_clue: before_state may be unknown, otherwise it must exist in the previous scene's events or unresolved_threads."
+        "character_state_change: before_state must exist in the previous scene's characters or events."
+        "relationship_change: before_state must exist in the previous scene's relationship_changes."
+        "conflict_change: before_state must exist in events, relationship_changes, or unresolved_threads."
+        "decision_or_consequence: before_state must exist in events or characters."
+        "thread_advanced and thread_closed: before_state must exist in unresolved_threads or events."
+        "thread_opened: unknown is allowed. Do not disguise an existing thread as new."
+        "goal_milestone: before_state must exist in events."
+        "characters, location, time_context, entrance_state, and exit_state must each appear independently at the payload top level."
+        "Do not omit those top-level fields because they already appear inside entrance_state or exit_state."
         + character_canon_instruction()
         + setting_canon_instruction()
         + established_facts_instruction()
@@ -639,54 +640,54 @@ def planning_progression_instruction():
 
 def planning_revision_instruction(feedback):
     reason = feedback.get("reason") or ""
-    parts = [f"上一版因{reason}被打回。"]
+    parts = [f"The previous plan was sent back because {reason}."]
     for item in feedback.get("failed_items") or []:
         progress_type = item.get("progress_type") or ""
         before = item.get("before_state")
-        allowed = "、".join(item.get("allowed_fields") or [])
-        parts.append(f"错项：类型{progress_type}，错误before_state为{before}，允许字段为{allowed or '未知'}。")
-    parts.append("new_clue / thread_opened 可写「未知」。")
-    parts.append("必须从允许字段原样复制，不得总结改写，不得从其他列挪句子。")
-    parts.append("禁止交回同一套错误 before_state。")
+        allowed = ", ".join(item.get("allowed_fields") or [])
+        parts.append(f"Bad item: type {progress_type}, wrong before_state {before}, allowed fields {allowed or 'unknown'}.")
+    parts.append("new_clue / thread_opened may use unknown.")
+    parts.append("Copy from allowed fields literally. Do not summarize or move a sentence from another column.")
+    parts.append("Do not resubmit the same wrong before_state set.")
     return "".join(parts)
 
 
 def first_draft_writing_instruction():
     return (
-        f"本次必须输出{MIN_CHARACTER_COUNT}～{MAX_CHARACTER_COUNT}个非空白字符，建议{PREFERRED_SOFT_MIN}～{PREFERRED_SOFT_MAX}。"
-        "写成12～15个有效段落，每段承担动作、互动、阻力、转折或结果。"
-        "禁止用大量环境描写凑字，禁止剧情摘要。"
-        "完成至少一项 progression_requirements。"
-        "必须遵守 scene_plan.must_not_happen、knowledge_boundary 和已批准世界规则。"
+        f"This draft must be {MIN_CHARACTER_COUNT}-{MAX_CHARACTER_COUNT} words, preferred {PREFERRED_SOFT_MIN}-{PREFERRED_SOFT_MAX}."
+        "Write 12-15 effective paragraphs. Each paragraph must carry action, interaction, resistance, a turning point, or a result."
+        "Do not pad with environment. Do not replace the scene with a plot summary."
+        "Complete at least one progression_requirements item."
+        "Obey scene_plan.must_not_happen, knowledge_boundary, and approved world rules."
         + character_canon_instruction()
         + setting_canon_instruction()
         + established_facts_instruction()
         + world_state_instruction()
-        + f"超过{MAX_CHARACTER_COUNT}不合格。必须压到硬上限以下。不能只改word_count。"
-        "正式长度以后端非空白实算为准。payload.word_count 不是官方计数。"
-        "不能只把 word_count 改成 1287/1250 来充合格。"
-        "返回前自检长度，但不能只改word_count。"
+        + f"Over {MAX_CHARACTER_COUNT} words fails. You must get under the hard maximum. Do not only change word_count."
+        "Official length is the backend word count. payload.word_count is not official."
+        "Do not pass by only setting word_count to 1287/1250."
+        "Self-check length before return, but do not only change word_count."
     )
 
 
-MEMORY_REFUSAL_RETRY_NOTE = "正文已通过审查，按已确认场次状态记账。"
+MEMORY_REFUSAL_RETRY_NOTE = "The prose already passed review. Bookkeep from the confirmed scene state."
 MEMORY_REFUSAL_RETRY_PACK_KEYS = ("character_canon", "setting_canon", "approved_facts", "previous_scene_state")
 
 
 def memory_proposal_instruction():
     return (
-        "这是虚构作品的场次状态记账，不是提取或保存真人记忆。"
-        "记录本场已确认的虚构事实变化。"
-        "若本场没有可记账的虚构事实变化，返回 payload {\"status\":\"skipped\",\"reason\":\"...\"}。"
-        "不要提取、交出或写入真人记忆。"
+        "This is fictional-work scene-state bookkeeping, not extracting or storing a real person's memory."
+        "Record confirmed fictional fact changes from this scene."
+        "If this scene has no durable new fictional fact, return payload {\"status\":\"skipped\",\"reason\":\"...\"}."
+        "Do not extract, hand over, or write a real person's memory."
     )
 
 
 def memory_refusal_retry_instruction():
     return (
-        "再次说明：这是虚构作品的场次状态记账，不是提取或保存真人记忆。"
-        "只记录本场已确认的虚构事实变化；没有可记账变化时返回 skipped 并写明原因。"
-        "不要提取、交出或写入真人记忆。"
+        "Again: this is fictional-work scene-state bookkeeping, not extracting or storing a real person's memory."
+        "Record only confirmed fictional fact changes from this scene. If there is nothing to record, return skipped and say why."
+        "Do not extract, hand over, or write a real person's memory."
     )
 
 

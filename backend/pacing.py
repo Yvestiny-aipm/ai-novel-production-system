@@ -10,30 +10,36 @@ PACING_LOOKBACK = 12
 PACING_RECENT_WINDOW = 6
 PACING_PRIOR_CAP = 8
 STALL_MARKERS = tuple(sorted((
-    "原路返回",
-    "继续观察",
-    "不离开",
-    "等下次",
-    "下一次",
-    "安全位置",
-    "整理记录",
-    "等待",
-    "复查",
-    "复核",
-    "留在",
-    "不下",
+    "keep watching",
+    "do not leave",
+    "wait next",
+    "next time",
+    "safe place",
+    "sort records",
+    "recheck",
+    "remain",
+    "return",
+    "review",
+    "stay",
+    "wait",
 ), key=len, reverse=True))
 ARRIVAL_MARKERS = tuple(sorted((
-    "转到",
-    "回到",
-    "来到",
-    "走到",
-    "进入",
-    "走进",
-    "前往",
-    "抵达",
-    "去到",
-    "去了",
+    "returned to",
+    "walked to",
+    "headed to",
+    "went to",
+    "come to",
+    "came to",
+    "go to",
+    "return to",
+    "walk to",
+    "head to",
+    "entered",
+    "arrived",
+    "reached",
+    "enter",
+    "arrive",
+    "reach",
 ), key=len, reverse=True))
 
 
@@ -49,24 +55,24 @@ def empty_pacing_state() -> dict:
 
 def pacing_state_instruction() -> str:
     return (
-        "context_pack.pacing_state 是最近已完成场的节奏信号，不是新门栏。"
-        "same_location_run 是连续停在同一处的已完成场数。"
-        "按落脚点计算；行程句里的出发地不算仍停在原处。"
-        "recent_locations / recent_goals 是最近几场原文。"
-        "stall_markers 是这些目标里出现的等待、复查、留在、不下这类词。"
-        "prior_locations 是已经去过、但不是此刻这一处的地点。"
-        "same_location_run 达到 4 且 stall_markers 非空时，本场不得只靠再等一次、再复核同一处、再留在原处推进；"
-        "必须换到 prior_locations 里的一处，或推进 previous_scene_state.unresolved_threads 里一条尚未关闭的悬念，且不能只改同一处的局部观察。"
-        "same_location_run 不足 4 时可以留在原处，但必须有新的去向、决定或打开/关闭悬念。"
-        "已经发生仍以 established_facts / chapter_summary 为准。"
-        "此刻仍以 world_state 为准。"
+        "context_pack.pacing_state is a pacing signal from recently completed scenes, not a new gate."
+        "same_location_run is the count of consecutive completed scenes that stayed in the same place."
+        "It is computed from the arrival point; a departure place in a travel sentence does not count as still staying."
+        "recent_locations / recent_goals are the original recent-scene strings."
+        "stall_markers are wait / recheck / remain / stay words found in those goals."
+        "prior_locations are places already visited that are not this place now."
+        "When same_location_run reaches 4 and stall_markers is not empty, this scene must not advance only by waiting again, rechecking the same place, or remaining there; "
+        "it must move to one of prior_locations, or advance one still-open thread in previous_scene_state.unresolved_threads, and must not only change a local observation of the same place."
+        "When same_location_run is under 4, staying is allowed, but there must be a new destination, decision, or an opened/closed thread."
+        "What already happened still follows established_facts / chapter_summary."
+        "The now-state still follows world_state."
     )
 
 
 def location_core(text) -> str:
     if not isinstance(text, str):
         return ""
-    return text.split("；", 1)[0].strip()
+    return text.replace(";", "；").split("；", 1)[0].strip()
 
 
 def location_anchor(text) -> str:
@@ -75,8 +81,9 @@ def location_anchor(text) -> str:
         return ""
     last_pos = -1
     last_len = 0
+    core_l = core.lower()
     for marker in ARRIVAL_MARKERS:
-        pos = core.rfind(marker)
+        pos = core_l.rfind(marker)
         if pos < 0:
             continue
         if pos > last_pos or (pos == last_pos and len(marker) > last_len):
@@ -86,7 +93,7 @@ def location_anchor(text) -> str:
         return core
     after = core[last_pos + last_len:]
     cut = len(after)
-    for sep in ("，", "。", "、"):
+    for sep in ("，", "。", "、", ",", "."):
         idx = after.find(sep)
         if 0 <= idx < cut:
             cut = idx
@@ -140,8 +147,9 @@ def _stall_markers(recent: list) -> list:
     for item in recent:
         texts = _string_items(item.get("scene_goal")) + _string_items(item.get("must_happen"))
         for text in texts:
+            low = text.lower()
             for marker in STALL_MARKERS:
-                if marker in text and marker not in seen:
+                if marker in low and marker not in seen:
                     seen.add(marker)
                     found.append(marker)
     return found

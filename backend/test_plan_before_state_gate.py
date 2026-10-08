@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import words
 
 from backend.harness import PLANNING_PROMPT_VERSION, validate_scene_plan_against_input, ContractFormatError
 from backend.progression import (PLAN_BEFORE_STATE_REASON, plan_before_state_conflict_items,
@@ -76,7 +77,7 @@ def first_scene_plan():
 
 def prose():
     return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
-        "text": "潮" * 1000, "word_count": 1250, "target_word_count": 1250,
+        "text": words(1000), "word_count": 1250, "target_word_count": 1250,
         "complete": True, "writer_self_check": {"complete": True},
     }}
 
@@ -91,15 +92,15 @@ def reviewer(role):
         "scene_state": dict(PREVIOUS),
         "progression_assessment": {"status": "achieved", "achieved_items": [{
             "progress_type": "new_clue", "target_key": "灯塔线索", "before_state": "未知",
-            "after_state": "发现便条", "evidence_text": "潮", "evidence_location": "draft.text",
-        }], "missing_items": [], "evidence": "潮"},
+            "after_state": "发现便条", "evidence_text": "word", "evidence_location": "draft.text",
+        }], "missing_items": [], "evidence": "word"},
     }}
 
 
 def memory():
     return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
         "memory_type": "narrative_event", "target_scope": "book_memory", "target_key": "林照-灯塔调查",
-        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "潮",
+        "action": "create", "before_value": None, "after_value": "林照完成本场调查", "evidence": "word",
         "evidence_location": "draft.payload.text", "change_reason": "审查通过", "conflict_status": "none",
         "write_policy": "human_confirmation", "status": "pending",
     }}
@@ -140,8 +141,8 @@ expect_plan_input(scene_plan(GATES_16_ITEMS), followup, ok=False)
 prompt = contract_system_prompt("ScenePlan")
 assert "progression_baseline" in prompt
 assert PLANNING_PROMPT_VERSION == "planning_progression_v4"
-assert "不得总结、改写" in planning_progression_instruction()
-assert "顶层独立出现" in planning_progression_instruction()
+assert "Do not summarize, rewrite" in planning_progression_instruction()
+assert "independently at the payload top level" in planning_progression_instruction()
 
 copied_character = "林照神色紧绷地站在档案柜前"
 like_20i_baseline = progression_baseline_from_state({
@@ -177,8 +178,8 @@ assert fb_messages[2]["content"] == planning_progression_instruction()
 assert fb_messages[3]["role"] == "user"
 assert PLAN_BEFORE_STATE_REASON in fb_messages[3]["content"]
 assert copied_character in fb_messages[3]["content"]
-assert "不得从其他列挪句子" in fb_messages[3]["content"]
-assert "禁止交回同一套错误 before_state" in fb_messages[3]["content"]
+assert "Do not summarize or move a sentence from another column." in fb_messages[3]["content"]
+assert "Do not resubmit the same wrong before_state set." in fb_messages[3]["content"]
 assert "你自称" not in fb_messages[3]["content"]
 assert "1287" not in fb_messages[3]["content"]
 

@@ -21,73 +21,73 @@ assert empty["recent_goals"] == []
 assert empty["stall_markers"] == []
 assert empty["prior_locations"] == []
 assert build_pacing_state(None) == empty
-assert build_pacing_state("脏") == empty
-assert location_core({"name": "北仓"}) == ""
-assert location_core("北仓内侧；货架深处") == "北仓内侧"
+assert build_pacing_state("dirty") == empty
+assert location_core({"name": "North Warehouse"}) == ""
+assert location_core("North Warehouse inner aisle; deep shelves") == "North Warehouse inner aisle"
 
-assert locations_same("北仓内侧与第二排货架", "北仓内侧，靠近第二排货架") is True
-assert locations_same("北仓内侧与第二排货架", "南码头登记处") is False
-assert locations_same("北仓内侧", "南码头") is False
-assert locations_same("", "北仓内侧与第二排货架") is False
+assert locations_same("North Warehouse inner aisle and the second shelf", "North Warehouse inner aisle, near the second shelf") is True
+assert locations_same("North Warehouse inner aisle and the second shelf", "South Dock registry") is False
+assert locations_same("North Warehouse inner aisle", "South Dock") is False
+assert locations_same("", "North Warehouse inner aisle and the second shelf") is False
 
-travel = "从南码头登记处转到北仓内侧，核对手册"
-assert "北仓内侧" in location_anchor(travel)
-assert "南码头" not in location_anchor(travel)
-assert location_anchor("北仓内侧与第二排货架") == "北仓内侧与第二排货架"
-assert location_anchor({"name": "北仓"}) == ""
-assert locations_same(travel, "北仓内侧与第二排货架") is True
-assert locations_same(travel, "南码头登记处") is False
-assert locations_same("从北仓内侧走到南码头登记处", "南码头登记处") is True
-assert locations_same("从北仓内侧走到南码头登记处", "北仓内侧与第二排货架") is False
+travel = "From South Dock registry go to North Warehouse inner aisle, check the ledger"
+assert "North Warehouse inner aisle" in location_anchor(travel)
+assert "South Dock" not in location_anchor(travel)
+assert location_anchor("North Warehouse inner aisle and the second shelf") == "North Warehouse inner aisle and the second shelf"
+assert location_anchor({"name": "North Warehouse"}) == ""
+assert locations_same(travel, "North Warehouse inner aisle and the second shelf") is True
+assert locations_same(travel, "South Dock registry") is False
+assert locations_same("From North Warehouse inner aisle walk to South Dock registry", "South Dock registry") is True
+assert locations_same("From North Warehouse inner aisle walk to South Dock registry", "North Warehouse inner aisle and the second shelf") is False
 
-north = "北仓内侧与第二排货架"
-north_variant = "北仓内侧，靠近第二排"
+north = "North Warehouse inner aisle and the second shelf"
+north_variant = "North Warehouse inner aisle, near the second row"
 four = [
-    {"location": north, "scene_goal": "在货架前等待编号", "must_happen": ["复查货架"]},
-    {"location": north_variant, "scene_goal": "继续等待", "must_happen": ["复查同一排"]},
-    {"location": north, "scene_goal": "等待回音", "must_happen": ["留下记录"]},
-    {"location": north_variant, "scene_goal": "复查缺口", "must_happen": ["等待答复"]},
+    {"location": north, "scene_goal": "wait for the number at the shelves", "must_happen": ["recheck the shelves"]},
+    {"location": north_variant, "scene_goal": "keep waiting", "must_happen": ["recheck the same row"]},
+    {"location": north, "scene_goal": "wait for a reply", "must_happen": ["leave a record"]},
+    {"location": north_variant, "scene_goal": "recheck the gap", "must_happen": ["wait for an answer"]},
 ]
 stuck = build_pacing_state(four)
 assert stuck["same_location_run"] == 4
-assert "等待" in stuck["stall_markers"]
-assert "复查" in stuck["stall_markers"]
+assert "wait" in stuck["stall_markers"]
+assert "recheck" in stuck["stall_markers"]
 assert stuck["prior_locations"] == []
 assert stuck["recent_locations"] == [item["location"] for item in four]
 assert stuck["recent_goals"] == [item["scene_goal"] for item in four]
 
-dock_then_north = [{"location": "南码头登记处", "scene_goal": "取得编号", "must_happen": ["拿到编号"]}] + four
+dock_then_north = [{"location": "South Dock registry", "scene_goal": "get the number", "must_happen": ["take the number"]}] + four
 moved = build_pacing_state(dock_then_north)
 assert moved["same_location_run"] == 4
-assert "南码头登记处" in moved["prior_locations"]
+assert "South Dock registry" in moved["prior_locations"]
 assert all(not locations_same(item, north) for item in moved["prior_locations"])
 
 two = [
-    {"location": north, "scene_goal": "复核编号", "must_happen": ["复核货架"]},
-    {"location": north_variant, "scene_goal": "再复核一次", "must_happen": ["留下"]},
+    {"location": north, "scene_goal": "review the number", "must_happen": ["review the shelves"]},
+    {"location": north_variant, "scene_goal": "review once more", "must_happen": ["remain"]},
 ]
 short = build_pacing_state(two)
 assert short["same_location_run"] == 2
-assert "复核" in short["stall_markers"]
+assert "review" in short["stall_markers"]
 
 arrived = build_pacing_state([
-    {"location": "南码头登记处", "scene_goal": "取得编号", "must_happen": ["拿到编号"]},
-    {"location": travel, "scene_goal": "核对手册", "must_happen": ["记下编号"]},
+    {"location": "South Dock registry", "scene_goal": "get the number", "must_happen": ["take the number"]},
+    {"location": travel, "scene_goal": "check the ledger", "must_happen": ["note the number"]},
 ])
 assert arrived["same_location_run"] == 1
-assert "南码头登记处" in arrived["prior_locations"]
-assert arrived["recent_locations"] == ["南码头登记处", travel]
+assert "South Dock registry" in arrived["prior_locations"]
+assert arrived["recent_locations"] == ["South Dock registry", travel]
 
 planning = planning_progression_instruction()
 assert "pacing_state" in planning
 assert "same_location_run" in planning
 assert "prior_locations" in planning
-assert "不得只靠" in planning
+assert "only by waiting" in planning
 pacing_text = pacing_state_instruction()
 assert "pacing_state" in pacing_text
-assert "不是新门栏" in pacing_text
-assert "落脚点" in pacing_text
-assert "出发地" in pacing_text
+assert "not a new gate" in pacing_text
+assert "arrival point" in pacing_text
+assert "departure place" in pacing_text
 assert "林照" not in pacing_text
 assert "灯塔" not in pacing_text
 assert "档案室" not in pacing_text
@@ -110,7 +110,7 @@ def assemble_pack(db, scene_id="s", **kwargs):
         pack_id="p", book_id="b", chapter_id="c", scene_id=scene_id, version=1,
         target_agent="planning", target_node="planning", brief_version=1, plan_version=1,
         story_state_version=1, canon_version=1, sources=[],
-        previous_scene_state={"characters": ["在场的人"]},
+        previous_scene_state={"characters": ["people onstage"]},
         **kwargs,
     )
 
@@ -124,7 +124,7 @@ with tempfile.TemporaryDirectory() as directory:
     db.commit()
     pack = assemble_pack(db)
     assert pack["pacing_state"] == empty
-    assert pack["world_state"]["present"] == ["在场的人"]
+    assert pack["world_state"]["present"] == ["people onstage"]
     assert pack["established_facts"]["facts"] == []
     assert "pacing_state" not in pack["established_facts"]
     db.close()

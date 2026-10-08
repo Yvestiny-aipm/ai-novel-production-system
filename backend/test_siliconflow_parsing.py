@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 from pathlib import Path
+from backend.test_english_fixtures import words
 
 from backend.siliconflow import (ESCAPE_UNESCAPED_QUOTES_IN_REVIEWER_STRINGS_RULE,
     ModelResponseParseError, PARSE_EXCERPT_LIMIT, PARSE_SUFFIX_LIMIT, PLAIN_PROSE_WRAP_RULE,
@@ -51,7 +52,7 @@ assert "Unterminated string" in str(error.parse_error) or "Unterminated" in str(
 
 
 # finish_reason=length is recorded as truncation, not a content failure.
-long_content = '{"text":"' + ("潮" * 80)
+long_content = '{"text":"' + (words(80))
 error = expect_parse(long_content, finish_reason="length", usage={"completion_tokens": 12},
                      code="MODEL_OUTPUT_TRUNCATED")
 assert error.to_audit()["finish_reason"] == "length"
@@ -111,7 +112,7 @@ assert valid[-20:] in error.to_audit()["response_suffix"]
 draft = {
     "contract_type": "ProseDraft", "contract_version": "v1",
     "payload": {
-        "text": "潮" * 1000, "word_count": 1250, "target_word_count": 1250,
+        "text": words(1000), "word_count": 1250, "target_word_count": 1250,
         "complete": True, "writer_self_check": {"complete": True},
     },
 }

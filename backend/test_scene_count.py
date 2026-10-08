@@ -1,5 +1,6 @@
 import sqlite3, tempfile
 from pathlib import Path
+from backend.test_english_fixtures import words
 
 from integration.run_real_test import run
 from integration.seed_real_test import seed
@@ -19,7 +20,7 @@ def plan(number):
 
 
 def reviewer(role, number):
-    evidence = f"第{number}场线索"
+    evidence = f"clue{number}"
     return {"contract_type": "ReviewerResult", "contract_version": "v1", "payload": {
         "reviewer_role": role, "result": "passed", "findings": [], "suggestions": [], "issue_count": 0,
         "severity": "ordinary", "impact_scope": "local", "true_conflict_candidate": False,
@@ -44,8 +45,8 @@ class OneSceneAdapter:
         if role == "planning":
             return plan(number)
         if role == "writing":
-            marker = f"第{number}场线索"
-            text = ("潮" * (1200 - len(marker))) + marker
+            marker = f"clue{number}"
+            text = words(1200, lead=marker, token=f"scene{number}")
             return {"contract_type": "ProseDraft", "contract_version": "v1", "payload": {
                 "text": text, "word_count": 1250, "target_word_count": 1250, "complete": True,
                 "writer_self_check": {"complete": True},
@@ -54,7 +55,7 @@ class OneSceneAdapter:
             return {"contract_type": "MemoryProposal", "contract_version": "v1", "payload": {
                 "memory_type": "narrative_event", "target_scope": "book_memory",
                 "target_key": f"林照-灯塔调查{number}", "action": "create", "before_value": None,
-                "after_value": "林照完成本场调查", "evidence": f"第{number}场线索",
+                "after_value": "Lin Zhao finished this scene's investigation", "evidence": f"clue{number}",
                 "evidence_location": "draft.payload.text", "change_reason": "审查通过",
                 "conflict_status": "none", "write_policy": "human_confirmation", "status": "pending",
             }}
